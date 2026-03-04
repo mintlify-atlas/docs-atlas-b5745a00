@@ -1,0 +1,113 @@
+{
+  "projectType": "framework",
+  "projectName": "oUF",
+  "projectDescription": "A powerful and flexible unit frame framework for World of Warcraft addons.",
+  "theme": "aspen",
+  "primaryColor": "#ac862b",
+  "lightColor": "#565b94",
+  "darkColor": "#8c889b",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/styles",
+              "concepts/elements",
+              "concepts/units",
+              "concepts/events"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-layout",
+              "guides/styling-frames",
+              "guides/custom-elements",
+              "guides/embedding",
+              "guides/nameplates"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/performance",
+              "advanced/troubleshooting",
+              "advanced/migration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/ouf",
+              "api/frame-methods",
+              "api/colors",
+              "api/factory"
+            ]
+          },
+          {
+            "group": "Elements",
+            "pages": [
+              "elements/overview",
+              "elements/health",
+              "elements/power",
+              "elements/auras",
+              "elements/castbar",
+              "elements/classpower",
+              "elements/portrait",
+              "elements/tags",
+              "elements/indicators",
+              "elements/all-elements"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Element system with 30+ built-in elements",
+    "Style registration and management",
+    "Single unit, group header, and nameplate spawning",
+    "Event-driven architecture with automatic updates",
+    "Powerful color system with curves and atlases",
+    "Tag system for dynamic text formatting",
+    "Blizzard frame replacement",
+    "Factory pattern for initialization control"
+  ],
+  "publicApiSurface": [
+    "oUF:RegisterStyle(name, func)",
+    "oUF:SetActiveStyle(name)",
+    "oUF:GetActiveStyle()",
+    "oUF:Spawn(unit, overrideName)",
+    "oUF:SpawnHeader(overrideName, template, ...)",
+    "oUF:SpawnNamePlates(prefix)",
+    "oUF:AddElement(name, update, enable, disable)",
+    "oUF:RegisterInitCallback(func)",
+    "oUF:RegisterMetaFunction(name, func)",
+    "oUF:Factory(func)",
+    "oUF:DisableBlizzard(unit)",
+    "frame:EnableElement(name, unit)",
+    "frame:DisableElement(name)",
+    "frame:IsElementEnabled(name)",
+    "frame:UpdateAllElements(event)",
+    "frame:Enable(asState)",
+    "frame:Disable()",
+    "Elements: Health, Power, Auras, Castbar, ClassPower, Portrait, Tags, Range, Runes, Totems, Stagger, and 20+ more"
+  ]
+}
