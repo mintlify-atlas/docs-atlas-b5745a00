@@ -1,0 +1,554 @@
+---
+title: Custom Elements
+description: Learn how to create your own custom elements using AddElement
+---
+
+Custom elements allow you to extend oUF with your own functionality. This guide shows you how to create elements from scratch.
+
+## Understanding Elements
+
+An element in oUF is a reusable piece of functionality that:
+
+1. **Enables** - Sets up event listeners and initial state
+2. **Updates** - Responds to events and updates the UI
+3. **Disables** - Cleans up when the element is removed
+
+Elements are automatically enabled when you add them to a frame and disabled when the frame is hidden or destroyed.
+
+## Element Structure
+
+Every element consists of three functions:
+
+```lua
+local function Update(self, event, unit)
+  -- Update logic here
+end
+
+local function Enable(self, unit)
+  -- Setup code here
+  return true  -- Must return true to enable
+end
+
+local function Disable(self)
+  -- Cleanup code here
+end
+
+-- Register the element
+oUF:AddElement('MyElement', Update, Enable, Disable)
+```
+
+## Basic Example: Combat Indicator
+
+Let's create a simple combat indicator element:
+
+```lua
+local _, ns = ...
+local oUF = ns.oUF
+
+-- Update function - called when events fire
+local function Update(self, event, unit)
+  if not unit or self.unit ~= unit then return end
+  
+  local element = self.CombatIcon
+  
+  -- Show icon if unit is in combat
+  if UnitAffectingCombat(unit) then
+    element:Show()
+  else
+    element:Hide()
+  end
+end
+
+-- Enable function - set up the element
+local function Enable(self, unit)
+  local element = self.CombatIcon
+  
+  if element then
+    -- Register events
+    self:RegisterEvent('PLAYER_REGEN_DISABLED', Update)
+    self:RegisterEvent('PLAYER_REGEN_ENABLED', Update)
+    self:RegisterEvent('UNIT_FLAGS', Update)
+    
+    -- Set default texture if needed
+    if element:IsObjectType('Texture') and not element:GetTexture() then
+      element:SetTexture('Interface\\CharacterFrame\\UI-StateIcon')
+      element:SetTexCoord(0.58, 0.90, 0.08, 0.41)
+    end
+    
+    return true
+  end
+end
+
+-- Disable function - clean up
+local function Disable(self)
+  local element = self.CombatIcon
+  
+  if element then
+    element:Hide()
+    self:UnregisterEvent('PLAYER_REGEN_DISABLED', Update)
+    self:UnregisterEvent('PLAYER_REGEN_ENABLED', Update)
+    self:UnregisterEvent('UNIT_FLAGS', Update)
+  end
+end
+
+-- Register with oUF
+oUF:AddElement('CombatIcon', Update, Enable, Disable)
+```
+
+Now use it in your layout:
+
+```lua
+local function StyleFrame(self, unit)
+  -- Create the texture
+  local CombatIcon = self:CreateTexture(nil, 'OVERLAY')
+  CombatIcon:SetSize(20, 20)
+  CombatIcon:SetPoint('LEFT', self, 'RIGHT', 5, 0)
+  
+  -- Register it
+  self.CombatIcon = CombatIcon
+end
+```
+
+<Note>
+The element is automatically enabled because you set `self.CombatIcon`. oUF calls `Enable()` for all registered elements during frame initialization.
+</Note>
+
+## Advanced Example: Custom Resource Bar
+
+Here's a more complex example showing a combo point display:
+
+```lua
+local _, ns = ...
+local oUF = ns.oUF
+
+local function Update(self, event, unit, powerType)
+  if self.unit ~= unit then return end
+  
+  local element = self.ComboDisplay
+  
+  -- Check if we should show combo points
+  local spec = GetSpecialization()
+  if not spec or select(6, GetSpecializationInfo(spec)) ~= 'ROGUE' then
+    element:Hide()
+    return
+  end
+  
+  -- Get current combo points
+  local cur = UnitPower(unit, Enum.PowerType.ComboPoints)
+  local max = UnitPowerMax(unit, Enum.PowerType.ComboPoints)
+  
+  -- Update each combo point
+  for i = 1, max do
+    if i <= cur then
+      element[i]:SetAlpha(1)
+    else
+      element[i]:SetAlpha(0.2)
+    end
+  end
+  
+  element:Show()
+  
+  -- Optional callback
+  if element.PostUpdate then
+    element:PostUpdate(unit, cur, max)
+  end
+end
+
+local function Enable(self, unit)
+  local element = self.ComboDisplay
+  
+  if element and UnitIsUnit(unit, 'player') then
+    -- Register power events
+    self:RegisterEvent('UNIT_POWER_FREQUENT', Update)
+    self:RegisterEvent('PLAYER_SPECIALIZATION_CHANGED', Update)
+    
+    return true
+  end
+end
+
+local function Disable(self)
+  local element = self.ComboDisplay
+  
+  if element then
+    element:Hide()
+    self:UnregisterEvent('UNIT_POWER_FREQUENT', Update)
+    self:UnregisterEvent('PLAYER_SPECIALIZATION_CHANGED', Update)
+  end
+end
+
+oUF:AddElement('ComboDisplay', Update, Enable, Disable)
+```
+
+Usage in layout:
+
+```lua
+local function StyleFrame(self, unit)
+  if unit ~= 'player' then return end
+  
+  -- Create container
+  local ComboDisplay = CreateFrame('Frame', nil, self)
+  ComboDisplay:SetSize(100, 10)
+  ComboDisplay:SetPoint('BOTTOM', self, 'TOP', 0, 5)
+  
+  -- Create 5 combo points
+  for i = 1, 5 do
+    local point = ComboDisplay:CreateTexture(nil, 'OVERLAY')
+    point:SetSize(18, 18)
+    
+    if i == 1 then
+      point:SetPoint('LEFT', ComboDisplay)
+    else
+      point:SetPoint('LEFT', ComboDisplay[i-1], 'RIGHT', 2, 0)
+    end
+    
+    point:SetTexture('Interface\\ComboFrame\\ComboPoint')
+    ComboDisplay[i] = point
+  end
+  
+  self.ComboDisplay = ComboDisplay
+end
+```
+
+## Element Best Practices
+
+<Steps>
+
+### Always check unit ownership
+
+```lua
+local function Update(self, event, unit)
+  -- Prevent updates for wrong units
+  if not unit or self.unit ~= unit then return end
+  
+  -- Your update logic
+end
+```
+
+### Store references properly
+
+```lua
+local function Enable(self, unit)
+  local element = self.MyElement
+  if element then
+    -- Store owner reference for later use
+    element.__owner = self
+    return true
+  end
+end
+```
+
+### Provide callbacks
+
+```lua
+local function Update(self, event, unit)
+  local element = self.MyElement
+  
+  -- Pre-update callback
+  if element.PreUpdate then
+    element:PreUpdate(unit)
+  end
+  
+  -- Your update logic
+  local value = DoSomething(unit)
+  
+  -- Post-update callback
+  if element.PostUpdate then
+    element:PostUpdate(unit, value)
+  end
+end
+```
+
+### Clean up in Disable
+
+```lua
+local function Disable(self)
+  local element = self.MyElement
+  if element then
+    -- Unregister all events
+    self:UnregisterEvent('EVENT_NAME', Update)
+    
+    -- Hide the element
+    element:Hide()
+    
+    -- Clear any timers or state
+    element:SetScript('OnUpdate', nil)
+  end
+end
+```
+
+</Steps>
+
+## Element Patterns
+
+### Pattern: Status Bar Element
+
+```lua
+local function Update(self, event, unit)
+  if not unit or self.unit ~= unit then return end
+  
+  local element = self.MyBar
+  
+  if element.PreUpdate then
+    element:PreUpdate(unit)
+  end
+  
+  local cur = GetCurrentValue(unit)
+  local max = GetMaxValue(unit)
+  
+  element:SetMinMaxValues(0, max)
+  element:SetValue(cur)
+  
+  if element.PostUpdate then
+    element:PostUpdate(unit, cur, max)
+  end
+end
+```
+
+### Pattern: Texture Element
+
+```lua
+local function Update(self, event, unit)
+  if not unit or self.unit ~= unit then return end
+  
+  local element = self.MyIcon
+  
+  local shouldShow = CheckCondition(unit)
+  
+  if shouldShow then
+    element:Show()
+    
+    -- Optional: update texture
+    local texture = GetTexturePath(unit)
+    element:SetTexture(texture)
+  else
+    element:Hide()
+  end
+end
+```
+
+### Pattern: Frame Container
+
+```lua
+local function Update(self, event, unit)
+  if not unit or self.unit ~= unit then return end
+  
+  local element = self.MyContainer
+  
+  -- Update children
+  for i = 1, #element do
+    local child = element[i]
+    local active = IsChildActive(unit, i)
+    
+    if active then
+      child:Show()
+      UpdateChild(child, unit, i)
+    else
+      child:Hide()
+    end
+  end
+end
+```
+
+## Override and ForceUpdate
+
+### Providing Override
+
+Allow layouts to completely replace your update logic:
+
+```lua
+local function Path(self, ...)
+  -- Call Override if it exists, otherwise use Update
+  return (self.MyElement.Override or Update)(self, ...)
+end
+
+local function Enable(self, unit)
+  local element = self.MyElement
+  if element then
+    self:RegisterEvent('SOME_EVENT', Path)  -- Use Path, not Update
+    return true
+  end
+end
+```
+
+Usage:
+
+```lua
+local function StyleFrame(self, unit)
+  local MyElement = CreateFrame('Frame', nil, self)
+  
+  -- Completely override the update
+  MyElement.Override = function(self, event, unit)
+    -- Custom logic
+  end
+  
+  self.MyElement = MyElement
+end
+```
+
+### Adding ForceUpdate
+
+Allow manual updates:
+
+```lua
+local function ForceUpdate(element)
+  return Path(element.__owner, 'ForceUpdate', element.__owner.unit)
+end
+
+local function Enable(self, unit)
+  local element = self.MyElement
+  if element then
+    element.__owner = self
+    element.ForceUpdate = ForceUpdate
+    return true
+  end
+end
+```
+
+Usage:
+
+```lua
+-- Manually trigger an update
+if frame.MyElement then
+  frame.MyElement:ForceUpdate()
+end
+```
+
+## Real-World Example: Dispel Indicator
+
+Here's a complete, production-ready element:
+
+```lua
+local _, ns = ...
+local oUF = ns.oUF
+
+-- Helper to check if we can dispel
+local canDispel = {}
+local function UpdateDispelCapability()
+  table.wipe(canDispel)
+  
+  -- Check player's dispel abilities
+  local spec = GetSpecialization()
+  if not spec then return end
+  
+  -- This is simplified - you'd need to check actual abilities
+  local _, class = UnitClass('player')
+  if class == 'PRIEST' or class == 'PALADIN' or class == 'SHAMAN' then
+    canDispel.Magic = true
+  end
+  if class == 'DRUID' or class == 'MONK' then
+    canDispel.Curse = true
+    canDispel.Poison = true
+  end
+end
+
+local function Update(self, event, unit)
+  if not unit or self.unit ~= unit then return end
+  
+  local element = self.DispelIndicator
+  
+  -- Check for dispellable aura
+  local hasDispellable = false
+  local dispelType
+  
+  AuraUtil.ForEachAura(unit, 'HARMFUL', nil, function(aura)
+    if aura.isHarmful and canDispel[aura.dispelName] then
+      hasDispellable = true
+      dispelType = aura.dispelName
+      return true  -- Stop iteration
+    end
+  end)
+  
+  if hasDispellable then
+    local color = oUF.colors.dispel[dispelType]
+    if color then
+      element:SetVertexColor(color:GetRGB())
+    end
+    element:Show()
+  else
+    element:Hide()
+  end
+  
+  if element.PostUpdate then
+    element:PostUpdate(unit, hasDispellable, dispelType)
+  end
+end
+
+local function Path(self, ...)
+  return (self.DispelIndicator.Override or Update)(self, ...)
+end
+
+local function ForceUpdate(element)
+  return Path(element.__owner, 'ForceUpdate', element.__owner.unit)
+end
+
+local function Enable(self, unit)
+  local element = self.DispelIndicator
+  
+  if element then
+    element.__owner = self
+    element.ForceUpdate = ForceUpdate
+    
+    UpdateDispelCapability()
+    
+    self:RegisterEvent('UNIT_AURA', Path)
+    self:RegisterEvent('PLAYER_SPECIALIZATION_CHANGED', function()
+      UpdateDispelCapability()
+      Path(self, 'PLAYER_SPECIALIZATION_CHANGED', self.unit)
+    end)
+    
+    if element:IsObjectType('Texture') and not element:GetTexture() then
+      element:SetTexture('Interface\\Buttons\\WHITE8X8')
+    end
+    
+    return true
+  end
+end
+
+local function Disable(self)
+  local element = self.DispelIndicator
+  
+  if element then
+    element:Hide()
+    self:UnregisterEvent('UNIT_AURA', Path)
+    self:UnregisterEvent('PLAYER_SPECIALIZATION_CHANGED', Path)
+  end
+end
+
+oUF:AddElement('DispelIndicator', Path, Enable, Disable)
+```
+
+## Testing Your Element
+
+<Tip>
+Test your element thoroughly:
+
+1. **Enable/Disable**: Does it clean up properly?
+2. **Unit changes**: Does it work when switching targets?
+3. **Events**: Are all events properly registered/unregistered?
+4. **Performance**: Use `/eventtrace` to check for excessive updates
+5. **Edge cases**: Test with different classes, specs, and units
+</Tip>
+
+## Common Pitfalls
+
+<Warning>
+**Don't forget to return true in Enable()** - If you don't return true, the element won't be enabled.
+</Warning>
+
+<Warning>
+**Always unregister events in Disable()** - Memory leaks happen when events aren't cleaned up.
+</Warning>
+
+<Warning>
+**Check unit ownership** - Always verify `self.unit == unit` in Update to avoid processing wrong units.
+</Warning>
+
+<Note>
+**Element names should be descriptive** - Use clear names like `DispelIndicator`, not `DI` or `MyElement`.
+</Note>
+
+## Next Steps
+
+- Study the [built-in elements](https://github.com/oUF-wow/oUF/tree/master/elements) for more examples
+- Learn about [embedding oUF](/guides/embedding) in your addon
+- Explore the [Health element source](/elements/health) for a complete reference

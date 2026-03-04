@@ -1,0 +1,454 @@
+---
+title: 'Indicator Elements'
+description: 'Display status indicators for leader, raid role, PvP, and more'
+---
+
+## Overview
+
+Indicator elements are simple texture-based widgets that show various unit states and statuses. They typically display an icon when a specific condition is met (e.g., unit is group leader, has PvP enabled, is ready for a ready check).
+
+## Common Features
+
+Most indicator elements share these characteristics:
+
+- **Widget Type**: Texture
+- **Updates**: By changing texture/atlas or visibility
+- **Size**: Typically 16x16 to 30x30 pixels
+- **Position**: Often placed on frame edges or corners
+
+## Leader Indicator
+
+Displays an icon when the unit is a group leader or guide.
+
+### Usage
+
+```lua
+local LeaderIndicator = self:CreateTexture(nil, 'OVERLAY')
+LeaderIndicator:SetSize(16, 16)
+LeaderIndicator:SetPoint('TOPLEFT', self, 'TOPLEFT', 2, -2)
+
+self.LeaderIndicator = LeaderIndicator
+```
+
+### Options
+
+<ParamField path="LeaderIndicator.useAtlasSize" type="boolean">
+  Use the atlas's predefined size instead of the texture's set dimensions.
+</ParamField>
+
+### Notes
+
+- Shows different icons for leaders vs LFG guides
+- Distinguishes between home group and instance group leaders
+- Updates on `UNIT_FLAGS`, `PARTY_LEADER_CHANGED`, `GROUP_ROSTER_UPDATE`
+
+### Callbacks
+
+<ParamField path="LeaderIndicator:PostUpdate" type="function">
+  ```lua
+  function(self, isLeader, isInLFGInstance)
+  ```
+  Called after the indicator updates.
+</ParamField>
+
+## Raid Role Indicator
+
+Shows main tank or main assist assignment in raids.
+
+### Usage
+
+```lua
+local RaidRoleIndicator = self:CreateTexture(nil, 'OVERLAY')
+RaidRoleIndicator:SetSize(16, 16)
+RaidRoleIndicator:SetPoint('TOP', self, 'BOTTOM', 0, -2)
+
+self.RaidRoleIndicator = RaidRoleIndicator
+```
+
+### Options
+
+<ParamField path="RaidRoleIndicator.useAtlasSize" type="boolean">
+  Use the atlas's predefined size.
+</ParamField>
+
+### Notes
+
+- Only shows in raids
+- Hidden when unit is in a vehicle
+- Updates on `GROUP_ROSTER_UPDATE`
+
+### Callbacks
+
+<ParamField path="RaidRoleIndicator:PostUpdate" type="function">
+  ```lua
+  function(self, role)
+  ```
+  Called after update. `role` is "MAINTANK" or "MAINASSIST".
+</ParamField>
+
+## PvP Indicator
+
+Displays PvP status, faction, and honor level.
+
+### Usage
+
+```lua
+local PvPIndicator = self:CreateTexture(nil, 'ARTWORK', nil, 1)
+PvPIndicator:SetSize(30, 30)
+PvPIndicator:SetPoint('LEFT', self, 'RIGHT', 5, 0)
+
+-- Optional badge for honor level
+local Badge = self:CreateTexture(nil, 'ARTWORK')
+Badge:SetSize(50, 52)
+Badge:SetPoint('CENTER', PvPIndicator)
+PvPIndicator.Badge = Badge
+
+self.PvPIndicator = PvPIndicator
+```
+
+### Sub-Widgets
+
+<ParamField path="PvPIndicator.Badge" type="Texture">
+  Displays the honor badge background. Must be on a lower sub-layer than the main texture.
+</ParamField>
+
+### Notes
+
+- Shows faction icon (Alliance/Horde) or FFA icon
+- Accounts for mercenary mode
+- Displays honor level badge when available
+- Updates on `UNIT_FACTION`, `HONOR_LEVEL_UPDATE`
+
+### Callbacks
+
+<ParamField path="PvPIndicator:PostUpdate" type="function">
+  ```lua
+  function(self, unit, status)
+  ```
+  `status` is "FFA", "Alliance", "Horde", or nil.
+</ParamField>
+
+## Ready Check Indicator
+
+Shows ready check status in party/raid.
+
+### Usage
+
+```lua
+local ReadyCheckIndicator = self:CreateTexture(nil, 'OVERLAY')
+ReadyCheckIndicator:SetSize(20, 20)
+ReadyCheckIndicator:SetPoint('CENTER', self)
+
+self.ReadyCheckIndicator = ReadyCheckIndicator
+```
+
+### Options
+
+<ParamField path="ReadyCheckIndicator.finishedTime" type="number">
+  Seconds to display after ready check completes. Defaults to 10.
+</ParamField>
+
+<ParamField path="ReadyCheckIndicator.fadeTime" type="number">
+  Fade-out duration in seconds. Defaults to 1.5.
+</ParamField>
+
+<ParamField path="ReadyCheckIndicator.useAtlasSize" type="boolean">
+  Use atlas size.
+</ParamField>
+
+### Attributes
+
+<ParamField path="ReadyCheckIndicator.status" type="string">
+  Current status: "ready", "notready", or "waiting".
+</ParamField>
+
+### Notes
+
+- Only works for party/raid units
+- Automatically fades out after completion
+- Updates on `READY_CHECK`, `READY_CHECK_CONFIRM`, `READY_CHECK_FINISHED`
+
+### Callbacks
+
+<ParamField path="ReadyCheckIndicator:PostUpdate" type="function">
+  ```lua
+  function(self, status)
+  ```
+  Called after status updates.
+</ParamField>
+
+<ParamField path="ReadyCheckIndicator:PostUpdateFadeOut" type="function">
+  ```lua
+  function(self)
+  ```
+  Called after fade-out animation completes.
+</ParamField>
+
+## Assistant Indicator
+
+Shows if the unit is a raid assistant.
+
+### Usage
+
+```lua
+local AssistantIndicator = self:CreateTexture(nil, 'OVERLAY')
+AssistantIndicator:SetSize(16, 16)
+AssistantIndicator:SetPoint('TOPRIGHT', self, 'TOPRIGHT', -2, -2)
+
+self.AssistantIndicator = AssistantIndicator
+```
+
+## Combat Indicator
+
+Indicates if the unit is in combat.
+
+### Usage
+
+```lua
+local CombatIndicator = self:CreateTexture(nil, 'OVERLAY')
+CombatIndicator:SetSize(20, 20)
+CombatIndicator:SetPoint('LEFT', self, 'RIGHT', 5, 0)
+CombatIndicator:SetTexture('Interface\\CharacterFrame\\UI-StateIcon')
+CombatIndicator:SetTexCoord(0.5, 1.0, 0.0, 0.49)
+
+self.CombatIndicator = CombatIndicator
+```
+
+## Group Role Indicator
+
+Shows the unit's group role (tank, healer, damage).
+
+### Usage
+
+```lua
+local GroupRoleIndicator = self:CreateTexture(nil, 'OVERLAY')
+GroupRoleIndicator:SetSize(16, 16)
+GroupRoleIndicator:SetPoint('TOPLEFT', self, 'TOPLEFT', 2, -2)
+
+self.GroupRoleIndicator = GroupRoleIndicator
+```
+
+## Phase Indicator
+
+Indicates when the unit is in a different phase.
+
+### Usage
+
+```lua
+local PhaseIndicator = self:CreateTexture(nil, 'OVERLAY')
+PhaseIndicator:SetSize(16, 16)
+PhaseIndicator:SetPoint('TOPRIGHT', self, 'LEFT', -2, 0)
+
+self.PhaseIndicator = PhaseIndicator
+```
+
+## PvP Classification Indicator
+
+Shows War Mode or PvP classification status.
+
+### Usage
+
+```lua
+local PvPClassificationIndicator = self:CreateTexture(nil, 'OVERLAY')
+PvPClassificationIndicator:SetSize(20, 20)
+PvPClassificationIndicator:SetPoint('RIGHT', self, 'LEFT', -5, 0)
+
+self.PvPClassificationIndicator = PvPClassificationIndicator
+```
+
+## Quest Indicator
+
+Shows if the unit is related to a quest.
+
+### Usage
+
+```lua
+local QuestIndicator = self:CreateTexture(nil, 'OVERLAY')
+QuestIndicator:SetSize(20, 20)
+QuestIndicator:SetPoint('TOPRIGHT', self, 'TOPLEFT', 0, 0)
+
+self.QuestIndicator = QuestIndicator
+```
+
+## Raid Target Indicator
+
+Displays the raid target icon (skull, cross, etc.).
+
+### Usage
+
+```lua
+local RaidTargetIndicator = self:CreateTexture(nil, 'OVERLAY')
+RaidTargetIndicator:SetSize(24, 24)
+RaidTargetIndicator:SetPoint('CENTER', self, 'TOP', 0, 0)
+
+self.RaidTargetIndicator = RaidTargetIndicator
+```
+
+## Resting Indicator
+
+Shows if the player is resting (in an inn or city).
+
+### Usage
+
+```lua
+local RestingIndicator = self:CreateTexture(nil, 'OVERLAY')
+RestingIndicator:SetSize(20, 20)
+RestingIndicator:SetPoint('TOPLEFT', self, 'BOTTOMLEFT', 0, -5)
+RestingIndicator:SetTexture('Interface\\CharacterFrame\\UI-StateIcon')
+RestingIndicator:SetTexCoord(0.0, 0.5, 0.0, 0.421875)
+
+self.RestingIndicator = RestingIndicator
+```
+
+## Resurrect Indicator
+
+Indicates if the unit has a pending resurrection.
+
+### Usage
+
+```lua
+local ResurrectIndicator = self:CreateTexture(nil, 'OVERLAY')
+ResurrectIndicator:SetSize(24, 24)
+ResurrectIndicator:SetPoint('CENTER', self)
+
+self.ResurrectIndicator = ResurrectIndicator
+```
+
+## Summon Indicator
+
+Shows if the unit has a pending summon.
+
+### Usage
+
+```lua
+local SummonIndicator = self:CreateTexture(nil, 'OVERLAY')
+SummonIndicator:SetSize(24, 24)
+SummonIndicator:SetPoint('CENTER', self)
+
+self.SummonIndicator = SummonIndicator
+```
+
+## Threat Indicator
+
+Displays threat status with color-coded visualization.
+
+### Usage
+
+```lua
+local ThreatIndicator = self:CreateTexture(nil, 'BACKGROUND')
+ThreatIndicator:SetAllPoints()
+ThreatIndicator:SetTexture('Interface\\Buttons\\WHITE8x8')
+
+self.ThreatIndicator = ThreatIndicator
+```
+
+### Notes
+
+This indicator typically uses a border/glow effect and colors based on threat level:
+- No threat: Hidden
+- Low threat: Yellow
+- Medium threat: Orange
+- High threat: Red
+
+## Multiple Indicators Example
+
+```lua
+local function CreateIndicators(self)
+    -- Leader icon (top-left)
+    local LeaderIndicator = self:CreateTexture(nil, 'OVERLAY')
+    LeaderIndicator:SetSize(14, 14)
+    LeaderIndicator:SetPoint('TOPLEFT', 2, -2)
+    self.LeaderIndicator = LeaderIndicator
+    
+    -- Raid role (bottom-left)
+    local RaidRoleIndicator = self:CreateTexture(nil, 'OVERLAY')
+    RaidRoleIndicator:SetSize(14, 14)
+    RaidRoleIndicator:SetPoint('BOTTOMLEFT', 2, 2)
+    self.RaidRoleIndicator = RaidRoleIndicator
+    
+    -- PvP status (top-right)
+    local PvPIndicator = self:CreateTexture(nil, 'OVERLAY')
+    PvPIndicator:SetSize(20, 20)
+    PvPIndicator:SetPoint('TOPRIGHT', -2, -2)
+    self.PvPIndicator = PvPIndicator
+    
+    -- Ready check (center)
+    local ReadyCheckIndicator = self:CreateTexture(nil, 'OVERLAY')
+    ReadyCheckIndicator:SetSize(24, 24)
+    ReadyCheckIndicator:SetPoint('CENTER')
+    self.ReadyCheckIndicator = ReadyCheckIndicator
+    
+    -- Raid target (above frame)
+    local RaidTargetIndicator = self:CreateTexture(nil, 'OVERLAY')
+    RaidTargetIndicator:SetSize(20, 20)
+    RaidTargetIndicator:SetPoint('BOTTOM', self, 'TOP', 0, 2)
+    self.RaidTargetIndicator = RaidTargetIndicator
+    
+    -- Threat border
+    local ThreatIndicator = self:CreateTexture(nil, 'BACKGROUND')
+    ThreatIndicator:SetPoint('TOPLEFT', -2, 2)
+    ThreatIndicator:SetPoint('BOTTOMRIGHT', 2, -2)
+    ThreatIndicator:SetTexture('Interface\\Buttons\\WHITE8x8')
+    self.ThreatIndicator = ThreatIndicator
+end
+```
+
+## Indicator Positioning Tips
+
+### Corner Positions
+
+```lua
+-- Top-left
+indicator:SetPoint('TOPLEFT', frame, 'TOPLEFT', 2, -2)
+
+-- Top-right  
+indicator:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -2, -2)
+
+-- Bottom-left
+indicator:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', 2, 2)
+
+-- Bottom-right
+indicator:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -2, 2)
+```
+
+### Outside Frame
+
+```lua
+-- Above
+indicator:SetPoint('BOTTOM', frame, 'TOP', 0, 2)
+
+-- Below
+indicator:SetPoint('TOP', frame, 'BOTTOM', 0, -2)
+
+-- Left side
+indicator:SetPoint('RIGHT', frame, 'LEFT', -2, 0)
+
+-- Right side
+indicator:SetPoint('LEFT', frame, 'RIGHT', 2, 0)
+```
+
+## Summary Table
+
+| Indicator | Shows | Events |
+|-----------|-------|--------|
+| LeaderIndicator | Group leader status | UNIT_FLAGS, PARTY_LEADER_CHANGED, GROUP_ROSTER_UPDATE |
+| RaidRoleIndicator | Main tank/assist | GROUP_ROSTER_UPDATE |
+| PvPIndicator | PvP/faction/honor | UNIT_FACTION, HONOR_LEVEL_UPDATE |
+| ReadyCheckIndicator | Ready check status | READY_CHECK, READY_CHECK_CONFIRM, READY_CHECK_FINISHED |
+| AssistantIndicator | Raid assistant | PARTY_LEADER_CHANGED, GROUP_ROSTER_UPDATE |
+| CombatIndicator | In combat | PLAYER_REGEN_DISABLED, PLAYER_REGEN_ENABLED |
+| GroupRoleIndicator | Tank/Healer/DPS role | GROUP_ROSTER_UPDATE |
+| PhaseIndicator | Different phase | UNIT_PHASE, PARTY_MEMBER_ENABLE, PARTY_MEMBER_DISABLE |
+| RaidTargetIndicator | Raid target icon | RAID_TARGET_UPDATE |
+| RestingIndicator | Resting in city/inn | PLAYER_UPDATE_RESTING |
+| ResurrectIndicator | Pending resurrection | INCOMING_RESURRECT_CHANGED |
+| SummonIndicator | Pending summon | INCOMING_SUMMON_CHANGED |
+| ThreatIndicator | Threat level | UNIT_THREAT_SITUATION_UPDATE |
+
+<Tip>
+  Stack multiple small indicators in corners to save space while showing maximum information.
+</Tip>
+
+<Note>
+  Most indicators automatically use appropriate atlas textures and will look consistent with the default UI style.
+</Note>

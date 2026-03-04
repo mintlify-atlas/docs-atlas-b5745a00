@@ -1,0 +1,386 @@
+---
+title: Performance Optimization
+description: Best practices and techniques for optimizing oUF unit frame performance
+---
+
+## Overview
+
+oUF is designed with performance in mind, but there are several patterns and techniques you can use to ensure your layout runs smoothly, especially in raid environments with 40+ frames.
+
+## Event Registration Patterns
+
+### Conditional Event Registration
+
+Only register events when elements need them. oUF's element system automatically handles this, but you should understand how it works.
+
+```lua
+local function Enable(self, unit)
+    local element = self.Health
+    if element then
+        -- Core events always registered
+        self:RegisterEvent('UNIT_HEALTH', Path)
+        self:RegisterEvent('UNIT_MAXHEALTH', Path)
+        
+        -- Conditional registration based on options
+        if element.colorThreat then
+            self:RegisterEvent('UNIT_THREAT_LIST_UPDATE', ColorPath)
+        end
+        
+        -- Only register prediction events if sub-widgets exist
+        if element.HealingAll or element.HealingPlayer or element.HealingOther then
+            self:RegisterEvent('UNIT_HEAL_PREDICTION', Path)
+        end
+        
+        return true
+    end
+end
+```
+
+<Tip>
+Disable elements you don't need using `frame:DisableElement('ElementName')` to reduce event processing overhead.
+</Tip>
+
+### Use Frequent Updates Sparingly
+
+For power bars, `frequentUpdates` triggers updates much more often:
+
+```lua
+-- Only use for player/target frames where smooth updates matter
+if unit == 'player' or unit == 'target' then
+    Power.frequentUpdates = true
+else
+    -- Use standard updates for raid frames
+    Power.frequentUpdates = false
+end
+```
+
+## Efficient Aura Handling
+
+### Limit Aura Count
+
+The auras element can be expensive with many frames. Limit what you display:
+
+```lua
+local Buffs = CreateFrame('Frame', nil, self)
+Buffs:SetSize(200, 20)
+
+-- Limit visible buffs on raid frames
+if unit:match('raid') then
+    Buffs.num = 3  -- Only show 3 buffs
+    Buffs.onlyShowPlayer = true  -- Only player's buffs
+else
+    Buffs.num = 32  -- Full display for player/target
+end
+
+self.Buffs = Buffs
+```
+
+### Custom Filtering
+
+Implement efficient filtering to reduce processing:
+
+```lua
+local importantBuffs = {
+    [774] = true,   -- Rejuvenation
+    [139] = true,   -- Renew
+    -- Add more spell IDs
+}
+
+function Buffs:FilterAura(unit, data)
+    -- For raid frames, only show important buffs you cast
+    if self.__owner.unit:match('raid') then
+        return data.isPlayerAura and importantBuffs[data.spellId]
+    end
+    
+    -- Show all for other units
+    return true
+end
+```
+
+<Warning>
+Avoid complex filtering logic that runs on every aura update. Cache lookups in tables using spell IDs as keys.
+</Warning>
+
+## StatusBar Smoothing
+
+### Choose Appropriate Smoothing
+
+oUF uses WoW's built-in StatusBar interpolation:
+
+```lua
+-- For player/target - smooth updates look better
+Health.smoothing = Enum.StatusBarInterpolation.Linear  -- or .Smooth
+
+-- For raid frames - instant updates perform better
+Health.smoothing = Enum.StatusBarInterpolation.Immediate
+```
+
+### Avoid OnUpdate Scripts
+
+Let the StatusBar handle smoothing instead of using OnUpdate:
+
+```lua
+-- GOOD: Use built-in smoothing
+element:SetValue(cur, element.smoothing)
+
+-- BAD: Custom OnUpdate smoothing (slower)
+element:SetScript('OnUpdate', function(self, elapsed)
+    -- Manual smoothing logic
+end)
+```
+
+## Memory Management
+
+### Table Reuse
+
+The auras element demonstrates efficient table reuse:
+
+```lua
+-- Wipe and reuse tables instead of creating new ones
+if isFullUpdate then
+    auras.allBuffs = table.wipe(auras.allBuffs or {})
+    auras.activeBuffs = table.wipe(auras.activeBuffs or {})
+end
+```
+
+<Tip>
+Use `table.wipe()` to clear tables for reuse instead of creating new ones. This reduces garbage collection overhead.
+</Tip>
+
+### Avoid String Concatenation in Loops
+
+String operations in hot paths create garbage:
+
+```lua
+-- BAD: Creates new strings every update
+local function Update(self, event, unit)
+    if event == 'UNIT_HEALTH' and unit == self.unit then
+        local text = UnitHealth(unit) .. ' / ' .. UnitHealthMax(unit)
+        self.Health.Text:SetText(text)
+    end
+end
+
+-- GOOD: Use formatting functions
+local function Update(self, event, unit)
+    if event == 'UNIT_HEALTH' and unit == self.unit then
+        self.Health.Text:SetFormattedText('%d / %d', UnitHealth(unit), UnitHealthMax(unit))
+    end
+end
+```
+
+## Frame Creation Best Practices
+
+### Pool Sub-Widgets
+
+For elements with dynamic buttons (like auras), pool and reuse frames:
+
+```lua
+local function CreateButton(element, index)
+    local button = CreateFrame('Button', element:GetDebugName() .. 'Button' .. index, element)
+    -- Setup button
+    return button
+end
+
+-- Buttons are created once and reused
+local function updateAura(element, unit, data, position)
+    local button = element[position]
+    if not button then
+        button = (element.CreateButton or CreateButton)(element, position)
+        table.insert(element, button)
+        element.createdButtons = element.createdButtons + 1
+    end
+    -- Update existing button
+end
+```
+
+### Minimize Frame Layers
+
+Each frame layer has overhead. Flatten your hierarchy:
+
+```lua
+-- GOOD: Flat hierarchy
+local Health = CreateFrame('StatusBar', nil, self)
+local HealthBG = Health:CreateTexture(nil, 'BACKGROUND')
+local HealthText = Health:CreateFontString(nil, 'OVERLAY')
+
+-- AVOID: Unnecessary container frames
+local HealthContainer = CreateFrame('Frame', nil, self)
+local Health = CreateFrame('StatusBar', nil, HealthContainer)
+```
+
+## Unit-Specific Optimizations
+
+### Raid Frames
+
+Optimize for many frames:
+
+```lua
+local function CreateRaidStyle(self, unit)
+    self:SetSize(60, 40)
+    
+    -- Minimal elements
+    local Health = CreateFrame('StatusBar', nil, self)
+    Health:SetAllPoints()
+    Health.colorClass = true
+    Health.smoothing = Enum.StatusBarInterpolation.Immediate  -- No smoothing
+    self.Health = Health
+    
+    local Name = Health:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
+    Name:SetPoint('CENTER')
+    self:Tag(Name, '[name]')
+    
+    -- Only show important debuffs
+    local Debuffs = CreateFrame('Frame', nil, self)
+    Debuffs:SetSize(60, 20)
+    Debuffs:SetPoint('TOP', self, 'BOTTOM')
+    Debuffs.num = 3
+    Debuffs.size = 20
+    Debuffs.onlyShowPlayer = true
+    self.Debuffs = Debuffs
+end
+```
+
+### Nameplate Frames
+
+Nameplates can appear and disappear rapidly:
+
+```lua
+local function CreateNameplateStyle(self, unit)
+    -- Keep it minimal
+    local Health = CreateFrame('StatusBar', nil, self)
+    Health:SetAllPoints()
+    Health.colorReaction = true
+    Health.smoothing = Enum.StatusBarInterpolation.Immediate
+    self.Health = Health
+    
+    -- Avoid expensive elements like portraits
+    -- Focus on essential information
+end
+```
+
+## Profiling Your Layout
+
+### Use Blizzard's Profiler
+
+```lua
+-- Enable Lua profiling
+/run SetCVar('scriptProfile', '1')
+/reload
+
+-- After testing
+/run UpdateAddOnCPUUsage()
+/run print(GetAddOnCPUUsage('YourLayoutName'))
+```
+
+### CPU Usage Commands
+
+```lua
+-- Check specific addon performance
+/script UpdateAddOnCPUUsage(); print(GetAddOnCPUUsage('oUF_YourLayout'))
+
+-- Compare with other addons
+/cpuusage
+```
+
+<Accordion title="Advanced Profiling Snippet">
+```lua
+local frame = CreateFrame('Frame')
+local start = debugprofilestop()
+
+frame:SetScript('OnUpdate', function(self, elapsed)
+    if debugprofilestop() - start > 5000 then  -- After 5 seconds
+        UpdateAddOnCPUUsage()
+        local usage = GetAddOnCPUUsage('oUF_YourLayout')
+        print(string.format('CPU Usage: %.2f ms', usage))
+        self:SetScript('OnUpdate', nil)
+    end
+end)
+```
+</Accordion>
+
+## Common Performance Pitfalls
+
+### Tag Updates
+
+Tags are evaluated frequently:
+
+```lua
+-- AVOID: Complex tag logic
+self:Tag(Name, '[difficulty][level][shortclassification] [name]')
+
+-- BETTER: Simple tags for raid frames
+self:Tag(Name, '[name]')
+```
+
+### Excessive Callbacks
+
+Don't do heavy work in PostUpdate:
+
+```lua
+-- BAD: Heavy processing on every health update
+function Health:PostUpdate(unit, cur, max)
+    -- Expensive calculations
+    for i = 1, 100 do
+        -- Complex logic
+    end
+end
+
+-- GOOD: Cache and throttle expensive operations
+local lastUpdate = 0
+function Health:PostUpdate(unit, cur, max)
+    local now = GetTime()
+    if now - lastUpdate < 0.1 then return end
+    lastUpdate = now
+    
+    -- Necessary updates only
+end
+```
+
+### Unit Existence Checks
+
+Cache unit existence when possible:
+
+```lua
+-- The element system already checks this
+local function Update(self, event, unit)
+    if self.unit ~= unit then return end  -- Built-in check
+    -- Your update logic
+end
+```
+
+## Benchmarking Tips
+
+### Test in Realistic Scenarios
+
+1. **40-player raid** - Maximum frame count
+2. **Heavy combat** - Multiple events firing
+3. **Multiple spell effects** - Lots of aura updates
+4. **Boss encounters** - Additional UI elements active
+
+### Memory Monitoring
+
+```lua
+/run UpdateAddOnMemoryUsage()
+/run print(GetAddOnMemoryUsage('oUF_YourLayout') .. ' KB')
+```
+
+## Summary Checklist
+
+<Accordion title="Performance Optimization Checklist">
+- [ ] Disable unused elements
+- [ ] Limit aura counts on raid frames
+- [ ] Use `Immediate` smoothing for raid frames
+- [ ] Implement efficient aura filtering
+- [ ] Reuse tables with `table.wipe()`
+- [ ] Minimize frame hierarchy depth
+- [ ] Avoid string concatenation in hot paths
+- [ ] Use simple tags for raid frames
+- [ ] Throttle expensive PostUpdate callbacks
+- [ ] Test with 40-player raids
+- [ ] Profile with Blizzard's tools
+- [ ] Monitor memory usage
+</Accordion>
+
+<Note>
+Performance optimization is about balance. Don't sacrifice functionality for marginal gains, but be mindful of expensive operations in frequently-called code.
+</Note>

@@ -1,0 +1,306 @@
+---
+title: 'Portrait Element'
+description: 'Display 2D or 3D unit portraits'
+---
+
+## Overview
+
+The Portrait element displays a unit's portrait, either as a 2D texture or a 3D model. It automatically updates when the unit's appearance changes and can optionally display class icons instead.
+
+## Basic Usage
+
+### 3D Portrait
+
+```lua
+-- Create a 3D model portrait
+local Portrait = CreateFrame('PlayerModel', nil, self)
+Portrait:SetSize(48, 48)
+Portrait:SetPoint('RIGHT', self, 'LEFT', -5, 0)
+
+-- Register with oUF
+self.Portrait = Portrait
+```
+
+### 2D Portrait
+
+```lua
+-- Create a 2D texture portrait
+local Portrait = self:CreateTexture(nil, 'OVERLAY')
+Portrait:SetSize(48, 48)
+Portrait:SetPoint('RIGHT', self, 'LEFT', -5, 0)
+
+-- Register with oUF
+self.Portrait = Portrait
+```
+
+## Widget
+
+<ParamField path="Portrait" type="PlayerModel | Texture" required>
+  Either a PlayerModel for 3D portraits or a Texture for 2D portraits.
+</ParamField>
+
+## Options
+
+<ParamField path="Portrait.showClass" type="boolean">
+  Display the unit's class icon instead of their portrait (2D portraits only).
+</ParamField>
+
+## Callbacks
+
+<ParamField path="Portrait:PreUpdate" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called before the element updates.
+  - `self` - the Portrait element
+  - `unit` - the unit being updated
+</ParamField>
+
+<ParamField path="Portrait:PostUpdate" type="function">
+  ```lua
+  function(self, unit, hasStateChanged)
+  ```
+  Called after the element updates.
+  - `self` - the Portrait element
+  - `unit` - the unit being updated
+  - `hasStateChanged` - true if the portrait appearance changed
+</ParamField>
+
+## Overrides
+
+<ParamField path="Portrait.Override" type="function">
+  ```lua
+  function(self, event, unit)
+  ```
+  Completely override the update function.
+</ParamField>
+
+## 3D Portrait Example
+
+```lua
+local Portrait = CreateFrame('PlayerModel', nil, self)
+Portrait:SetSize(60, 60)
+Portrait:SetPoint('RIGHT', self, 'LEFT', -10, 0)
+
+-- Add a border
+local border = self:CreateTexture(nil, 'BACKGROUND')
+border:SetPoint('TOPLEFT', Portrait, -1, 1)
+border:SetPoint('BOTTOMRIGHT', Portrait, 1, -1)
+border:SetTexture('Interface\\Buttons\\WHITE8x8')
+border:SetVertexColor(0, 0, 0)
+
+Portrait.PostUpdate = function(self, unit, hasStateChanged)
+    if hasStateChanged then
+        -- Adjust camera position for better framing
+        self:SetCamDistanceScale(1.0)
+        self:SetPortraitZoom(1)
+        self:SetPosition(0, 0, 0.05)
+    end
+end
+
+self.Portrait = Portrait
+```
+
+## 2D Portrait with Class Icon
+
+```lua
+local Portrait = self:CreateTexture(nil, 'ARTWORK')
+Portrait:SetSize(50, 50)
+Portrait:SetPoint('LEFT', self, 'RIGHT', 5, 0)
+
+-- Circular portrait
+Portrait:SetTexCoord(0.15, 0.85, 0.15, 0.85)
+
+-- Show class icon for players
+Portrait.showClass = true
+
+-- Add circular mask (optional)
+local mask = self:CreateMaskTexture()
+mask:SetTexture('Interface\\CHARACTERFRAME\\TempPortraitAlphaMask', 'CLAMPTOBLACKADDITIVE', 'CLAMPTOBLACKADDITIVE')
+mask:SetAllPoints(Portrait)
+Portrait:AddMaskTexture(mask)
+
+self.Portrait = Portrait
+```
+
+## 2D Portrait in Health Bar
+
+```lua
+-- Health bar with portrait on the left
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetSize(150, 30)
+Health:SetPoint('CENTER')
+Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+
+-- Portrait texture inside the health bar
+local Portrait = Health:CreateTexture(nil, 'BACKGROUND', nil, 1)
+Portrait:SetSize(28, 28)
+Portrait:SetPoint('LEFT', Health, 1, 0)
+
+-- Crop portrait edges
+Portrait:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+
+self.Health = Health
+self.Portrait = Portrait
+```
+
+## Rounded 3D Portrait
+
+```lua
+local Portrait = CreateFrame('PlayerModel', nil, self)
+Portrait:SetSize(64, 64)
+Portrait:SetPoint('TOPLEFT', self, 'TOPRIGHT', 5, 0)
+
+-- Create a circular mask
+local mask = self:CreateMaskTexture()
+mask:SetTexture('Interface\\CHARACTERFRAME\\TempPortraitAlphaMask', 'CLAMPTOBLACKADDITIVE', 'CLAMPTOBLACKADDITIVE')
+mask:SetAllPoints(Portrait)
+Portrait:AddMaskTexture(mask)
+
+-- Add a circular border
+local border = self:CreateTexture(nil, 'OVERLAY')
+border:SetSize(70, 70)
+border:SetPoint('CENTER', Portrait)
+border:SetTexture('Interface\\Artifacts\\ArtifactPower-QuestBorder')
+
+self.Portrait = Portrait
+```
+
+## Conditional Display
+
+```lua
+local Portrait = CreateFrame('PlayerModel', nil, self)
+Portrait:SetSize(40, 40)
+Portrait:SetPoint('LEFT', self, 'RIGHT', 5, 0)
+
+Portrait.PostUpdate = function(self, unit, hasStateChanged)
+    -- Hide portrait for NPCs, show class icon instead
+    if not UnitIsPlayer(unit) then
+        self:Hide()
+    else
+        self:Show()
+    end
+end
+
+self.Portrait = Portrait
+```
+
+## Dynamic Camera Adjustment
+
+```lua
+local Portrait = CreateFrame('PlayerModel', nil, self)
+Portrait:SetSize(50, 50)
+Portrait:SetPoint('TOPRIGHT', self, 'TOPLEFT', -2, -2)
+
+Portrait.PostUpdate = function(self, unit, hasStateChanged)
+    if not hasStateChanged then return end
+    
+    -- Adjust camera based on race
+    local race = select(2, UnitRace(unit))
+    
+    if race == 'Tauren' or race == 'Draenei' then
+        -- Zoom out for larger races
+        self:SetCamDistanceScale(1.2)
+    elseif race == 'Gnome' or race == 'Goblin' then
+        -- Zoom in for smaller races
+        self:SetCamDistanceScale(0.9)
+    else
+        self:SetCamDistanceScale(1.0)
+    end
+end
+
+self.Portrait = Portrait
+```
+
+## Background Portrait (Full Frame)
+
+```lua
+-- Create a large 2D portrait as background
+local Portrait = self:CreateTexture(nil, 'BACKGROUND')
+Portrait:SetAllPoints(self)
+Portrait:SetAlpha(0.3) -- Semi-transparent
+
+-- Gradient overlay to make text readable
+local gradient = self:CreateTexture(nil, 'BACKGROUND', nil, 1)
+gradient:SetAllPoints(self)
+gradient:SetColorTexture(0, 0, 0)
+gradient:SetGradient('HORIZONTAL', 
+    CreateColor(0, 0, 0, 0.8), 
+    CreateColor(0, 0, 0, 0.3)
+)
+
+self.Portrait = Portrait
+```
+
+## Class Icon Override
+
+```lua
+local Portrait = self:CreateTexture(nil, 'OVERLAY')
+Portrait:SetSize(40, 40)
+Portrait:SetPoint('CENTER', self)
+
+-- Always show class icons, even for NPCs
+Portrait.Override = function(self, event, unit)
+    local _, class = UnitClass(unit)
+    if class then
+        self:SetAtlas('classicon-' .. class)
+        self:Show()
+    else
+        self:Hide()
+    end
+end
+
+self.Portrait = Portrait
+```
+
+## Portrait with Status Indicator
+
+```lua
+local Portrait = CreateFrame('PlayerModel', nil, self)
+Portrait:SetSize(45, 45)
+Portrait:SetPoint('CENTER', self, 'LEFT', 0, 0)
+
+-- Add status overlay
+local statusOverlay = Portrait:CreateTexture(nil, 'OVERLAY')
+statusOverlay:SetAllPoints()
+statusOverlay:SetColorTexture(0, 0, 0, 0)
+
+Portrait.PostUpdate = function(self, unit, hasStateChanged)
+    -- Gray out portrait if dead
+    if UnitIsDead(unit) then
+        statusOverlay:SetColorTexture(0.3, 0.3, 0.3, 0.7)
+    elseif UnitIsGhost(unit) then
+        statusOverlay:SetColorTexture(0.2, 0.2, 0.5, 0.5)
+    elseif not UnitIsConnected(unit) then
+        statusOverlay:SetColorTexture(0.5, 0.5, 0.5, 0.7)
+    else
+        statusOverlay:SetColorTexture(0, 0, 0, 0)
+    end
+end
+
+self.Portrait = Portrait
+```
+
+## Notes
+
+<Note>
+  3D portraits (PlayerModel) may show a question mark model if the client doesn't have the model information for the unit yet.
+</Note>
+
+<Tip>
+  For better performance in raid frames, consider using 2D portraits instead of 3D models, especially if you're displaying 40+ frames.
+</Tip>
+
+<Warning>
+  PlayerModel widgets can be resource-intensive. Avoid using too many 3D portraits simultaneously if performance is a concern.
+</Warning>
+
+## Attributes
+
+<ParamField path="Portrait.guid" type="string">
+  Internal: Stores the unit's GUID to detect when the unit changes.
+</ParamField>
+
+<ParamField path="Portrait.state" type="boolean">
+  Internal: Tracks whether the unit is connected and visible.
+</ParamField>

@@ -1,0 +1,394 @@
+---
+title: 'Frame Methods'
+description: 'Instance methods available on all oUF unit frames'
+---
+
+## Overview
+
+All frames created by oUF (via `:Spawn()` or `:SpawnHeader()`) have access to a set of methods for managing elements and controlling frame behavior.
+
+---
+
+## Element Management
+
+### EnableElement
+
+Activates an element for the frame.
+
+```lua
+frame:EnableElement(name, unit)
+```
+
+<ParamField path="name" type="string" required>
+  Name of the element to enable (e.g., "Health", "Power", "Auras")
+</ParamField>
+
+<ParamField path="unit" type="string">
+  Unit to pass to the element's Enable function. Defaults to the frame's unit.
+</ParamField>
+
+<Note>
+  Elements are automatically enabled when frames are spawned if the frame has a table/frame with the element's name. You typically only need to call this manually if you dynamically add elements after spawn.
+</Note>
+
+**Example:**
+
+```lua
+-- In your style function
+local function MyStyle(frame, unit)
+  -- Create health element
+  local Health = CreateFrame('StatusBar', nil, frame)
+  Health:SetAllPoints()
+  frame.Health = Health
+  
+  -- Manually enable if needed (usually automatic)
+  -- frame:EnableElement('Health')
+end
+```
+
+---
+
+### DisableElement
+
+Deactivates an element for the frame.
+
+```lua
+frame:DisableElement(name)
+```
+
+<ParamField path="name" type="string" required>
+  Name of the element to disable
+</ParamField>
+
+**Example:**
+
+```lua
+-- Disable power bar for dead units
+if UnitIsDead(frame.unit) then
+  frame:DisableElement('Power')
+else
+  frame:EnableElement('Power')
+end
+```
+
+---
+
+### IsElementEnabled
+
+Checks if an element is currently enabled on the frame.
+
+```lua
+local enabled = frame:IsElementEnabled(name)
+```
+
+<ParamField path="name" type="string" required>
+  Name of the element to check
+</ParamField>
+
+<ResponseField name="enabled" type="boolean">
+  `true` if the element is enabled, `false` or `nil` otherwise
+</ResponseField>
+
+**Example:**
+
+```lua
+if frame:IsElementEnabled('Castbar') then
+  print('Castbar is active')
+end
+```
+
+---
+
+## Updates
+
+### UpdateAllElements
+
+Triggers an update on all enabled elements for the frame.
+
+```lua
+frame:UpdateAllElements(event)
+```
+
+<ParamField path="event" type="string" required>
+  Event name to pass to element update functions. This helps elements determine what changed.
+</ParamField>
+
+<Note>
+  This method checks if the frame's unit exists before running updates. If the unit doesn't exist, the update is skipped.
+</Note>
+
+**Callbacks:**
+
+You can define these optional callbacks on your frame to hook into the update cycle:
+
+```lua
+function frame:PreUpdate(event)
+  -- Called before elements are updated
+end
+
+function frame:PostUpdate(event)
+  -- Called after all elements are updated
+end
+```
+
+**Example:**
+
+```lua
+-- Force a full update when something changes
+frame:UpdateAllElements('ForceUpdate')
+
+-- Update after applying a custom change
+frame.Health:SetHeight(30)
+frame:UpdateAllElements('ConfigUpdate')
+```
+
+---
+
+## Unit Watch
+
+### Enable
+
+Toggles the frame's visibility based on whether its unit exists.
+
+```lua
+frame:Enable(asState)
+```
+
+<ParamField path="asState" type="boolean">
+  - `true` - Sets the `state-unitexists` attribute to a boolean value
+  - `false` or `nil` - Shows the frame if the unit exists, hides it otherwise
+</ParamField>
+
+<Note>
+  This is a reference to Blizzard's `RegisterUnitWatch` function and is automatically called for frames spawned via `:Spawn()`.
+</Note>
+
+**Example:**
+
+```lua
+-- Enable unit watch (usually automatic)
+frame:Enable()
+```
+
+---
+
+### Disable
+
+Unregisters the frame from unit watch and hides it.
+
+```lua
+frame:Disable()
+```
+
+**Example:**
+
+```lua
+-- Temporarily disable a frame
+frame:Disable()
+
+-- Re-enable later
+frame:Enable()
+```
+
+---
+
+### IsEnabled
+
+Checks if the frame is registered with the unit existence monitor.
+
+```lua
+local enabled = frame:IsEnabled()
+```
+
+<ResponseField name="enabled" type="boolean">
+  `true` if the frame is registered with unit watch, `false` otherwise
+</ResponseField>
+
+<Note>
+  This is a reference to Blizzard's `UnitWatchRegistered` function.
+</Note>
+
+**Example:**
+
+```lua
+if frame:IsEnabled() then
+  print('Frame is watching for unit existence')
+end
+```
+
+---
+
+## Frame Properties
+
+All oUF frames have these standard properties:
+
+### unit
+
+The current unit identifier for the frame.
+
+```lua
+print('Frame unit:', frame.unit)  -- "player", "target", etc.
+```
+
+---
+
+### realUnit
+
+The actual unit identifier, before vehicle swapping.
+
+```lua
+-- When in a vehicle:
+print(frame.unit)      -- "vehicle"
+print(frame.realUnit)  -- "player"
+```
+
+---
+
+### style
+
+The name of the style applied to the frame.
+
+```lua
+print('Frame style:', frame.style)  -- "MyLayout"
+```
+
+---
+
+### __elements
+
+Array of enabled element update functions.
+
+```lua
+-- Print number of active elements
+print('Active elements:', #frame.__elements)
+```
+
+<Warning>
+  This is an internal property. Do not modify it directly.
+</Warning>
+
+---
+
+## Special Frame Types
+
+### Nameplate Frames
+
+Frames spawned via `:SpawnNamePlates()` have additional properties:
+
+```lua
+if frame.isNamePlate then
+  -- Access widget container
+  if frame.WidgetContainer then
+    -- Position or modify widgets
+  end
+  
+  -- Access soft target frame
+  if frame.SoftTargetFrame then
+    -- Customize soft targeting
+  end
+end
+```
+
+---
+
+### Child Frames
+
+Frames in group headers may have these properties:
+
+```lua
+if frame.hasChildren then
+  print('This frame has child frames')
+end
+
+if frame.isChild then
+  print('This is a child frame')
+end
+```
+
+---
+
+## Usage Examples
+
+### Conditional Element Management
+
+```lua
+local function MyStyle(frame, unit)
+  -- Setup frame...
+  
+  -- Only enable castbar for player and target
+  if unit == 'player' or unit == 'target' then
+    local Castbar = CreateFrame('StatusBar', nil, frame)
+    Castbar:SetHeight(20)
+    Castbar:SetPoint('TOP', frame, 'BOTTOM', 0, -5)
+    frame.Castbar = Castbar
+    -- Will auto-enable
+  end
+end
+```
+
+---
+
+### Manual Update Triggering
+
+```lua
+-- In a config function
+function MyLayout:UpdateHealthHeight(height)
+  for _, frame in ipairs(oUF.objects) do
+    if frame.Health then
+      frame.Health:SetHeight(height)
+      frame:UpdateAllElements('ConfigUpdate')
+    end
+  end
+end
+```
+
+---
+
+### PreUpdate and PostUpdate Hooks
+
+```lua
+local function MyStyle(frame, unit)
+  -- ... setup elements ...
+  
+  function frame:PreUpdate(event)
+    -- Perform actions before elements update
+    if event == 'UNIT_HEALTH' then
+      self.healthUpdateCount = (self.healthUpdateCount or 0) + 1
+    end
+  end
+  
+  function frame:PostUpdate(event)
+    -- Perform actions after all elements update
+    if self.healthUpdateCount and self.healthUpdateCount > 10 then
+      print('Health has updated many times')
+      self.healthUpdateCount = 0
+    end
+  end
+end
+```
+
+---
+
+### Dynamic Element Toggling
+
+```lua
+-- Toggle element based on combat state
+local function UpdateCombatElements()
+  for _, frame in ipairs(oUF.objects) do
+    if UnitAffectingCombat('player') then
+      if frame.CombatIndicator and not frame:IsElementEnabled('CombatIndicator') then
+        frame:EnableElement('CombatIndicator')
+      end
+    else
+      if frame:IsElementEnabled('CombatIndicator') then
+        frame:DisableElement('CombatIndicator')
+      end
+    end
+  end
+end
+
+local combatWatcher = CreateFrame('Frame')
+combatWatcher:RegisterEvent('PLAYER_REGEN_DISABLED')
+combatWatcher:RegisterEvent('PLAYER_REGEN_ENABLED')
+combatWatcher:SetScript('OnEvent', UpdateCombatElements)
+```

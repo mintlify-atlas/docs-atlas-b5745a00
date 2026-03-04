@@ -1,0 +1,478 @@
+---
+title: Styling Frames
+description: Learn how to position, size, and style your oUF unit frames
+---
+
+This guide covers the visual aspects of oUF frames: positioning, sizing, textures, colors, and fonts.
+
+## Frame Positioning
+
+### Basic Positioning
+
+Position frames using standard WoW anchoring:
+
+```lua
+-- Absolute positioning
+local player = oUF:Spawn('player')
+player:SetPoint('CENTER', UIParent, 'CENTER', -220, -250)
+
+-- Relative to other frames
+local target = oUF:Spawn('target')
+target:SetPoint('LEFT', player, 'RIGHT', 10, 0)
+
+-- Multiple anchor points
+local pet = oUF:Spawn('pet')
+pet:SetPoint('TOPLEFT', player, 'BOTTOMLEFT', 0, -5)
+pet:SetPoint('TOPRIGHT', player, 'BOTTOMRIGHT', 0, -5)
+```
+
+### Positioning Group Headers
+
+Group headers have special positioning considerations:
+
+```lua
+local party = oUF:SpawnHeader(
+  'oUF_Party',
+  nil,
+  'party',
+  'showParty', true,
+  'yOffset', -5,  -- Vertical spacing between frames
+  'point', 'TOP',  -- Anchor point for each frame
+  'oUF-initialConfigFunction', [[self:SetWidth(180); self:SetHeight(40)]]
+)
+party:SetPoint('LEFT', UIParent, 'LEFT', 10, 0)
+```
+
+<Note>
+The header's `SetPoint()` positions the entire group. Use `xOffset`, `yOffset`, and layout attributes to control spacing between individual frames.
+</Note>
+
+## Frame Sizing
+
+### Setting Size
+
+```lua
+local function StyleFrame(self, unit)
+  -- Method 1: Direct size
+  self:SetSize(200, 50)
+  
+  -- Method 2: Separate width and height
+  self:SetWidth(200)
+  self:SetHeight(50)
+  
+  -- Method 3: Size from anchors
+  self:SetPoint('TOPLEFT', UIParent, 'CENTER', -100, 25)
+  self:SetPoint('BOTTOMRIGHT', UIParent, 'CENTER', 100, -25)
+end
+```
+
+### Element Sizing
+
+Size elements relative to their parent:
+
+```lua
+-- Health bar takes top 60% of frame
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetPoint('TOPLEFT')
+Health:SetPoint('TOPRIGHT')
+Health:SetHeight(self:GetHeight() * 0.6)
+
+-- Power bar takes bottom 40%
+local Power = CreateFrame('StatusBar', nil, self)
+Power:SetPoint('BOTTOMLEFT')
+Power:SetPoint('BOTTOMRIGHT')
+Power:SetHeight(self:GetHeight() * 0.4)
+
+-- Or use absolute values
+Health:SetHeight(30)
+Power:SetHeight(15)
+```
+
+### Responsive Sizing
+
+Adjust sizes based on unit type:
+
+```lua
+local function StyleFrame(self, unit)
+  if unit == 'player' or unit == 'target' then
+    self:SetSize(200, 50)
+  elseif unit:match('party') then
+    self:SetSize(150, 40)
+  elseif unit:match('raid') then
+    self:SetSize(80, 40)
+  elseif unit:match('boss') then
+    self:SetSize(180, 45)
+  else
+    -- Default for pet, focus, etc.
+    self:SetSize(120, 35)
+  end
+end
+```
+
+## Textures
+
+### Status Bar Textures
+
+Set textures for health and power bars:
+
+```lua
+-- Using built-in Blizzard textures
+Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+Power:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+
+-- Using a custom texture from your addon
+Health:SetStatusBarTexture('Interface\\AddOns\\MyLayout\\textures\\statusbar')
+
+-- Using SharedMedia (if available)
+local LSM = LibStub('LibSharedMedia-3.0')
+Health:SetStatusBarTexture(LSM:Fetch('statusbar', 'Glamour'))
+```
+
+### Common Texture Paths
+
+```lua
+-- Blizzard statusbar textures
+'Interface\\TargetingFrame\\UI-StatusBar'
+'Interface\\RaidFrame\\Raid-Bar-Hp-Fill'
+'Interface\\Buttons\\WHITE8X8'
+
+-- Solid colors (useful for testing)
+local bg = self:CreateTexture(nil, 'BACKGROUND')
+bg:SetAllPoints()
+bg:SetColorTexture(0, 0, 0, 0.5)  -- Black with 50% alpha
+```
+
+### Background Textures
+
+```lua
+local function StyleFrame(self, unit)
+  -- Method 1: Using backdrop
+  self:SetBackdrop({
+    bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+    edgeFile = 'Interface\\Buttons\\WHITE8X8',
+    edgeSize = 1,
+    insets = {left = 0, right = 0, top = 0, bottom = 0}
+  })
+  self:SetBackdropColor(0, 0, 0, 0.5)
+  self:SetBackdropBorderColor(0, 0, 0, 1)
+  
+  -- Method 2: Using texture
+  local bg = self:CreateTexture(nil, 'BACKGROUND')
+  bg:SetAllPoints()
+  bg:SetTexture('Interface\\ChatFrame\\ChatFrameBackground')
+  bg:SetVertexColor(0.1, 0.1, 0.1, 0.9)
+end
+```
+
+## Colors
+
+### Health Bar Colors
+
+oUF provides automatic coloring options:
+
+```lua
+local Health = CreateFrame('StatusBar', nil, self)
+
+-- Color by class (player/party members)
+Health.colorClass = true
+
+-- Color by reaction (hostile/neutral/friendly)
+Health.colorReaction = true
+
+-- Smooth gradient based on health percentage
+Health.colorSmooth = true
+
+-- Default green color for health
+Health.colorHealth = true
+
+-- Show disconnected units as grey
+Health.colorDisconnected = true
+
+-- Show tapped units as grey
+Health.colorTapping = true
+
+-- Multiple options (priority order matters)
+Health.colorTapping = true
+Health.colorDisconnected = true
+Health.colorClass = true
+Health.colorReaction = true
+Health.colorHealth = true  -- Fallback
+```
+
+<Note>
+Color options are checked in order of priority. The first matching condition determines the color.
+</Note>
+
+### Power Bar Colors
+
+```lua
+local Power = CreateFrame('StatusBar', nil, self)
+
+-- Color by power type (mana, rage, energy, etc.)
+Power.colorPower = true
+
+-- Use atlas textures for power (if available)
+Power.colorPowerAtlas = true
+Power.colorPower = true  -- Required for colorPowerAtlas
+
+-- Smooth gradient for power
+Power.colorPowerSmooth = true
+Power.colorPower = true  -- Required
+
+-- Class-based coloring
+Power.colorClass = true
+```
+
+### Custom Colors
+
+Access and modify the color table:
+
+```lua
+local function StyleFrame(self, unit)
+  -- Access built-in colors
+  local classColor = self.colors.class['WARRIOR']
+  local healthColor = self.colors.health
+  local powerColor = self.colors.power['MANA']
+  
+  -- Manual coloring
+  Health:SetStatusBarColor(classColor:GetRGB())
+  
+  -- Create custom colors
+  local myColor = oUF:CreateColor(255, 100, 50)  -- RGB
+  Health:SetStatusBarColor(myColor:GetRGB())
+end
+```
+
+### Background Colors
+
+Set background colors for depth:
+
+```lua
+-- Health background
+local HealthBG = Health:CreateTexture(nil, 'BACKGROUND')
+HealthBG:SetAllPoints(Health)
+HealthBG:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+HealthBG:SetVertexColor(0.2, 0.2, 0.2, 0.5)
+Health.bg = HealthBG
+
+-- Power background
+local PowerBG = Power:CreateTexture(nil, 'BACKGROUND')
+PowerBG:SetAllPoints(Power)
+PowerBG:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+PowerBG:SetVertexColor(0.2, 0.2, 0.2, 0.5)
+Power.bg = PowerBG
+```
+
+## Fonts
+
+### Creating Font Strings
+
+```lua
+-- Basic font string
+local Name = Health:CreateFontString(nil, 'OVERLAY')
+Name:SetPoint('LEFT', Health, 2, 0)
+Name:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+Name:SetJustifyH('LEFT')
+Name:SetShadowOffset(1, -1)
+Name:SetShadowColor(0, 0, 0, 1)
+
+-- Using tags for dynamic text
+self:Tag(Name, '[name]')
+```
+
+### Common Font Paths
+
+```lua
+-- Blizzard fonts
+'Fonts\\FRIZQT__.TTF'      -- Standard UI font
+'Fonts\\ARIALN.TTF'        -- Arial Narrow
+'Fonts\\skurri.ttf'        -- Quest font
+'Fonts\\MORPHEUS.ttf'      -- Mail font
+
+-- Font flags
+'OUTLINE'        -- Black outline
+'THICKOUTLINE'   -- Thick outline
+'MONOCHROME'     -- Sharp, pixelated
+'OUTLINE, MONOCHROME'  -- Combined
+```
+
+### Font Positioning
+
+```lua
+-- Name on left
+local Name = Health:CreateFontString(nil, 'OVERLAY')
+Name:SetPoint('LEFT', Health, 2, 0)
+Name:SetJustifyH('LEFT')
+self:Tag(Name, '[name]')
+
+-- Health value on right
+local HealthValue = Health:CreateFontString(nil, 'OVERLAY')
+HealthValue:SetPoint('RIGHT', Health, -2, 0)
+HealthValue:SetJustifyH('RIGHT')
+self:Tag(HealthValue, '[curhp]')
+
+-- Centered text
+local Level = Health:CreateFontString(nil, 'OVERLAY')
+Level:SetPoint('CENTER', Health)
+Level:SetJustifyH('CENTER')
+self:Tag(Level, '[level]')
+```
+
+### Dynamic Font Sizes
+
+```lua
+local function StyleFrame(self, unit)
+  local fontSize
+  
+  if unit:match('raid') then
+    fontSize = 10
+  elseif unit:match('party') then
+    fontSize = 11
+  else
+    fontSize = 13
+  end
+  
+  local Name = Health:CreateFontString(nil, 'OVERLAY')
+  Name:SetFont('Fonts\\FRIZQT__.TTF', fontSize, 'OUTLINE')
+  self:Tag(Name, '[name]')
+end
+```
+
+## Borders and Highlights
+
+### Frame Borders
+
+```lua
+-- Using backdrop
+self:SetBackdrop({
+  bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+  edgeFile = 'Interface\\Buttons\\WHITE8X8',
+  edgeSize = 2,  -- Border thickness
+  insets = {left = 1, right = 1, top = 1, bottom = 1}
+})
+self:SetBackdropBorderColor(0, 0, 0, 1)
+
+-- Custom border texture
+local border = self:CreateTexture(nil, 'OVERLAY')
+border:SetPoint('TOPLEFT', -2, 2)
+border:SetPoint('BOTTOMRIGHT', 2, -2)
+border:SetTexture('Interface\\AddOns\\MyLayout\\textures\\border')
+```
+
+### Threat Highlight
+
+```lua
+-- Create threat highlight texture
+local ThreatIndicator = Health:CreateTexture(nil, 'OVERLAY')
+ThreatIndicator:SetAllPoints(self)
+ThreatIndicator:SetTexture('Interface\\Buttons\\WHITE8X8')
+ThreatIndicator:SetBlendMode('ADD')
+ThreatIndicator:SetVertexColor(0, 0, 0, 0)  -- Initially invisible
+
+self.ThreatIndicator = ThreatIndicator
+self.ThreatIndicator.IsObjectType = function() return true end  -- Required
+```
+
+## Complete Styling Example
+
+```lua
+local function StyleFrame(self, unit)
+  -- Frame size
+  self:SetSize(200, 50)
+  
+  -- Background
+  self:SetBackdrop({
+    bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+    edgeFile = 'Interface\\Buttons\\WHITE8X8',
+    edgeSize = 1,
+  })
+  self:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+  self:SetBackdropBorderColor(0, 0, 0, 1)
+  
+  -- Health bar
+  local Health = CreateFrame('StatusBar', nil, self)
+  Health:SetPoint('TOPLEFT', 1, -1)
+  Health:SetPoint('TOPRIGHT', -1, -1)
+  Health:SetHeight(32)
+  Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Health.colorTapping = true
+  Health.colorDisconnected = true
+  Health.colorClass = true
+  Health.colorReaction = true
+  Health.colorHealth = true
+  
+  -- Health background
+  local HealthBG = Health:CreateTexture(nil, 'BACKGROUND')
+  HealthBG:SetAllPoints()
+  HealthBG:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  HealthBG:SetVertexColor(0.2, 0.2, 0.2, 0.5)
+  Health.bg = HealthBG
+  
+  self.Health = Health
+  
+  -- Power bar
+  local Power = CreateFrame('StatusBar', nil, self)
+  Power:SetPoint('BOTTOMLEFT', 1, 1)
+  Power:SetPoint('BOTTOMRIGHT', -1, 1)
+  Power:SetHeight(15)
+  Power:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Power.colorPower = true
+  
+  -- Power background
+  local PowerBG = Power:CreateTexture(nil, 'BACKGROUND')
+  PowerBG:SetAllPoints()
+  PowerBG:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  PowerBG:SetVertexColor(0.2, 0.2, 0.2, 0.5)
+  Power.bg = PowerBG
+  
+  self.Power = Power
+  
+  -- Name text
+  local Name = Health:CreateFontString(nil, 'OVERLAY')
+  Name:SetPoint('LEFT', Health, 3, 0)
+  Name:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+  Name:SetJustifyH('LEFT')
+  Name:SetShadowOffset(1, -1)
+  Name:SetShadowColor(0, 0, 0, 0.8)
+  self:Tag(Name, '[name]')
+  
+  -- Health value
+  local HealthValue = Health:CreateFontString(nil, 'OVERLAY')
+  HealthValue:SetPoint('RIGHT', Health, -3, 0)
+  HealthValue:SetFont('Fonts\\FRIZQT__.TTF', 11, 'OUTLINE')
+  HealthValue:SetJustifyH('RIGHT')
+  HealthValue:SetShadowOffset(1, -1)
+  HealthValue:SetShadowColor(0, 0, 0, 0.8)
+  self:Tag(HealthValue, '[perhp]%')
+  
+  -- Level (center of power bar)
+  local Level = Power:CreateFontString(nil, 'OVERLAY')
+  Level:SetPoint('CENTER', Power)
+  Level:SetFont('Fonts\\FRIZQT__.TTF', 10, 'OUTLINE')
+  self:Tag(Level, '[difficulty][level]')
+end
+```
+
+## Tips and Best Practices
+
+<Tip>
+**Use insets for cleaner borders**: When using backdrops, small insets (1-2px) prevent the border from overlapping the status bar texture.
+</Tip>
+
+<Tip>
+**Test with multiple classes**: Colors look different on each class. Test your layout with characters of different classes.
+</Tip>
+
+<Warning>
+**Avoid hardcoded positions**: Use relative positioning so frames adapt if you change sizes later.
+</Warning>
+
+<Note>
+**Performance**: Excessive use of textures and overlays can impact performance, especially for raid frames. Keep it simple for group frames.
+</Note>
+
+## Next Steps
+
+- Learn about [custom elements](/guides/custom-elements) to add unique functionality
+- Explore the [Health element](/elements/health) for advanced options
+- Check out [Tags](/elements/tags) for dynamic text formatting

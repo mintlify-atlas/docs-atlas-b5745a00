@@ -1,0 +1,403 @@
+---
+title: 'Auras Element'
+description: 'Display and manage buffs and debuffs on unit frames'
+---
+
+## Overview
+
+The Auras element handles the creation and updating of aura buttons (buffs and debuffs). It supports three widget types: combined Auras, separate Buffs, or separate Debuffs. The element includes extensive filtering, sorting, and layout options.
+
+## Basic Usage
+
+### Combined Buffs and Debuffs
+
+```lua
+-- Single container for both buffs and debuffs
+local Auras = CreateFrame('Frame', nil, self)
+Auras:SetPoint('BOTTOMLEFT', self, 'TOPLEFT', 0, 2)
+Auras:SetSize(200, 64)
+
+Auras.numBuffs = 16
+Auras.numDebuffs = 16
+Auras.size = 20
+Auras.spacing = 2
+
+self.Auras = Auras
+```
+
+### Separate Buffs and Debuffs
+
+```lua
+-- Separate containers for buffs and debuffs
+local Buffs = CreateFrame('Frame', nil, self)
+Buffs:SetPoint('BOTTOMLEFT', self, 'TOPLEFT', 0, 2)
+Buffs:SetSize(200, 40)
+Buffs.size = 20
+
+local Debuffs = CreateFrame('Frame', nil, self)
+Debuffs:SetPoint('BOTTOMRIGHT', self, 'TOPRIGHT', 0, 2)
+Debuffs:SetSize(200, 40)
+Debuffs.size = 20
+
+self.Buffs = Buffs
+self.Debuffs = Debuffs
+```
+
+## Widgets
+
+<ParamField path="Auras" type="Frame">
+  A Frame to hold buttons representing both buffs and debuffs
+</ParamField>
+
+<ParamField path="Buffs" type="Frame">
+  A Frame to hold buttons representing buffs only
+</ParamField>
+
+<ParamField path="Debuffs" type="Frame">
+  A Frame to hold buttons representing debuffs only
+</ParamField>
+
+<Note>
+  At least one of the above widgets must be present for the element to work.
+</Note>
+
+## Display Options
+
+<ParamField path="size" type="number">
+  Aura button size (width and height). Defaults to 16.
+</ParamField>
+
+<ParamField path="width" type="number">
+  Aura button width. Takes priority over `size`.
+</ParamField>
+
+<ParamField path="height" type="number">
+  Aura button height. Takes priority over `size`.
+</ParamField>
+
+<ParamField path="spacing" type="number">
+  Spacing between buttons. Defaults to 0.
+</ParamField>
+
+<ParamField path="spacingX" type="number">
+  Horizontal spacing between buttons. Takes priority over `spacing`.
+</ParamField>
+
+<ParamField path="spacingY" type="number">
+  Vertical spacing between buttons. Takes priority over `spacing`.
+</ParamField>
+
+<ParamField path="growthX" type="string">
+  Horizontal growth direction: 'RIGHT' or 'LEFT'. Defaults to 'RIGHT'.
+</ParamField>
+
+<ParamField path="growthY" type="string">
+  Vertical growth direction: 'UP' or 'DOWN'. Defaults to 'UP'.
+</ParamField>
+
+<ParamField path="initialAnchor" type="string">
+  Anchor point for aura buttons. Defaults to 'BOTTOMLEFT'.
+</ParamField>
+
+<ParamField path="maxCols" type="number">
+  Maximum number of columns before wrapping to new row. Defaults to element width divided by button size.
+</ParamField>
+
+## Filtering Options
+
+<ParamField path="filter" type="string">
+  Default aura filter. Defaults to 'HELPFUL' for buffs and 'HARMFUL' for debuffs. Can be a function that returns a filter string.
+</ParamField>
+
+<ParamField path="onlyShowPlayer" type="boolean">
+  Only show auras created by the player or their vehicle.
+</ParamField>
+
+### Auras-Specific Options
+
+<ParamField path="numBuffs" type="number">
+  Maximum number of buffs to display. Defaults to 32.
+</ParamField>
+
+<ParamField path="numDebuffs" type="number">
+  Maximum number of debuffs to display. Defaults to 40.
+</ParamField>
+
+<ParamField path="numTotal" type="number">
+  Maximum total number of auras. Prioritizes buffs over debuffs. Defaults to `numBuffs + numDebuffs`.
+</ParamField>
+
+<ParamField path="gap" type="boolean">
+  Creates an invisible gap button between buffs and debuffs. Defaults to false.
+</ParamField>
+
+<ParamField path="buffFilter" type="string">
+  Custom filter for buffs. Takes priority over `filter`.
+</ParamField>
+
+<ParamField path="debuffFilter" type="string">
+  Custom filter for debuffs. Takes priority over `filter`.
+</ParamField>
+
+### Buffs/Debuffs-Specific Options
+
+<ParamField path="num" type="number">
+  Number of auras to display. Defaults to 32 for Buffs, 40 for Debuffs.
+</ParamField>
+
+## Visual Options
+
+<ParamField path="disableMouse" type="boolean">
+  Disable mouse events on aura buttons.
+</ParamField>
+
+<ParamField path="disableCooldown" type="boolean">
+  Disable the cooldown spiral on aura buttons.
+</ParamField>
+
+<ParamField path="showStealableBuffs" type="boolean">
+  Display a stealable texture on buffs that can be stolen.
+</ParamField>
+
+<ParamField path="showType" type="boolean">
+  Show overlay texture colored by dispel type for all auras.
+</ParamField>
+
+<ParamField path="showDebuffType" type="boolean">
+  Show overlay texture colored by dispel type for debuffs only.
+</ParamField>
+
+<ParamField path="showBuffType" type="boolean">
+  Show overlay texture colored by dispel type for buffs only.
+</ParamField>
+
+<ParamField path="minCount" type="number">
+  Minimum aura stack count for the count text to be visible. Defaults to 2.
+</ParamField>
+
+<ParamField path="maxCount" type="number">
+  Maximum aura stack count to display. Counts above this show "*". Defaults to 999.
+</ParamField>
+
+<ParamField path="tooltipAnchor" type="string">
+  Tooltip anchor point. Defaults to 'ANCHOR_BOTTOMRIGHT', or 'ANCHOR_CURSOR' if frame has anchoring restrictions.
+</ParamField>
+
+<ParamField path="reanchorIfVisibleChanged" type="boolean">
+  Reanchors buttons when the number of visible auras changes.
+</ParamField>
+
+## Callbacks
+
+<ParamField path="PreUpdate" type="function">
+  ```lua
+  function(self, unit, isFullUpdate)
+  ```
+  Called before the element updates.
+</ParamField>
+
+<ParamField path="PostUpdate" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called after the element updates.
+</ParamField>
+
+<ParamField path="PostUpdateButton" type="function">
+  ```lua
+  function(self, button, unit, data, position)
+  ```
+  Called after an aura button is updated.
+  - `button` - the aura button
+  - `data` - [AuraData](https://warcraft.wiki.gg/wiki/Struct_AuraData) table
+  - `position` - button position
+</ParamField>
+
+<ParamField path="PostCreateButton" type="function">
+  ```lua
+  function(self, button)
+  ```
+  Called after a new aura button is created.
+</ParamField>
+
+<ParamField path="PostProcessAuraData" type="function">
+  ```lua
+  function(self, unit, data, filter)
+  ```
+  Called after aura data is processed. Can modify and return the data.
+</ParamField>
+
+<ParamField path="PostUpdateGapButton" type="function">
+  ```lua
+  function(self, unit, gapButton, position)
+  ```
+  Called after the invisible gap button is updated (Auras only, when `gap = true`).
+</ParamField>
+
+## Overrides
+
+<ParamField path="FilterAura" type="function">
+  ```lua
+  function(self, unit, data, filter)
+  ```
+  Custom filter function. Return `true` to show the aura, `false` to hide it.
+</ParamField>
+
+<ParamField path="SortAuras" type="function">
+  ```lua
+  function(a, b)
+  ```
+  Custom sorting function for all auras. Return `true` if `a` should come before `b`.
+</ParamField>
+
+<ParamField path="SortBuffs" type="function">
+  ```lua
+  function(a, b)
+  ```
+  Custom sorting function for buffs. Takes priority over `SortAuras`.
+</ParamField>
+
+<ParamField path="SortDebuffs" type="function">
+  ```lua
+  function(a, b)
+  ```
+  Custom sorting function for debuffs. Takes priority over `SortAuras`.
+</ParamField>
+
+<ParamField path="CreateButton" type="function">
+  ```lua
+  function(self, position)
+  ```
+  Custom function to create aura buttons. Must return a Button frame.
+</ParamField>
+
+<ParamField path="SetPosition" type="function">
+  ```lua
+  function(self, from, to)
+  ```
+  Custom function to position aura buttons.
+</ParamField>
+
+## Advanced Example
+
+```lua
+-- Create buffs container
+local Buffs = CreateFrame('Frame', nil, self)
+Buffs:SetPoint('TOPRIGHT', self, 'TOPLEFT', -5, 0)
+Buffs:SetSize(200, 100)
+
+-- Layout options
+Buffs.size = 24
+Buffs.spacing = 2
+Buffs.initialAnchor = 'TOPRIGHT'
+Buffs.growthX = 'LEFT'
+Buffs.growthY = 'DOWN'
+
+-- Filtering
+Buffs.num = 20
+Buffs.onlyShowPlayer = false
+
+-- Visual options
+Buffs.showBuffType = true
+Buffs.showStealableBuffs = true
+
+-- Custom filter: only show buffs we can cancel or that we cast
+Buffs.FilterAura = function(self, unit, data)
+    if data.isPlayerAura then
+        return true -- Always show our own buffs
+    end
+    
+    if data.isCancelable and UnitIsUnit(unit, 'player') then
+        return true -- Show cancelable buffs on player
+    end
+    
+    return false
+end
+
+-- Custom button creation for custom styling
+Buffs.PostCreateButton = function(self, button)
+    -- Add a custom border
+    button.Border = button:CreateTexture(nil, 'OVERLAY', nil, 1)
+    button.Border:SetPoint('TOPLEFT', -1, 1)
+    button.Border:SetPoint('BOTTOMRIGHT', 1, -1)
+    button.Border:SetTexture('Interface\\Buttons\\WHITE8x8')
+    button.Border:SetVertexColor(0, 0, 0)
+    
+    -- Customize count font
+    button.Count:SetFont('Fonts\\ARIALN.TTF', 14, 'OUTLINE')
+    button.Count:ClearAllPoints()
+    button.Count:SetPoint('BOTTOMRIGHT', 2, 0)
+end
+
+-- Custom update logic
+Buffs.PostUpdateButton = function(self, button, unit, data, position)
+    -- Highlight buffs we cast
+    if data.isPlayerAura then
+        button.Border:SetVertexColor(1, 1, 0) -- Yellow border
+    else
+        button.Border:SetVertexColor(0, 0, 0) -- Black border
+    end
+    
+    -- Make important buffs larger
+    local important = {
+        [1459] = true, -- Arcane Intellect
+        [21562] = true, -- Power Word: Fortitude
+    }
+    
+    if important[data.spellId] then
+        button:SetScale(1.2)
+    else
+        button:SetScale(1.0)
+    end
+end
+
+self.Buffs = Buffs
+
+-- Create debuffs container
+local Debuffs = CreateFrame('Frame', nil, self)
+Debuffs:SetPoint('BOTTOMRIGHT', self, 'BOTTOMLEFT', -5, 0)
+Debuffs:SetSize(200, 50)
+
+Debuffs.size = 24
+Debuffs.spacing = 2
+Debuffs.num = 10
+Debuffs.showDebuffType = true
+
+-- Only show debuffs we can dispel
+Debuffs.FilterAura = function(self, unit, data)
+    if data.isStealable then
+        return true
+    end
+    
+    -- Check if we can dispel this debuff type
+    local dispelType = data.dispelName
+    -- Add your class-specific dispel logic here
+    
+    return false
+end
+
+self.Debuffs = Debuffs
+```
+
+## Button Structure
+
+Each aura button created by the element has the following sub-widgets:
+
+- **button.Icon** - Texture showing the aura icon
+- **button.Count** - FontString showing stack count
+- **button.Cooldown** - Cooldown frame showing duration
+- **button.Overlay** - Texture showing dispel type color
+- **button.Stealable** - Texture showing stealable indicator
+
+## Button Attributes
+
+- **button.auraInstanceID** - Unique ID for the aura
+- **button.isHarmfulAura** - Boolean indicating if it's a debuff
+
+<Tip>
+  Use the `FilterAura` override to implement custom filtering logic, such as showing only important buffs/debuffs, player-cast auras, or dispellable debuffs.
+</Tip>
+
+<Note>
+  The element uses Blizzard's new aura system introduced in Dragonflight. It works with aura instance IDs and the C_UnitAuras API.
+</Note>

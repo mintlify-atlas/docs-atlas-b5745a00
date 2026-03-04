@@ -1,0 +1,414 @@
+---
+title: 'All Elements Reference'
+description: 'Complete list of all available oUF elements'
+---
+
+## Core Display Elements
+
+These elements form the foundation of unit frame displays.
+
+### Health
+
+Displays the unit's health as a status bar with support for healing prediction, damage absorbs, and temporary health loss.
+
+**Widget**: StatusBar  
+**Sub-widgets**: TempLoss, HealingAll, HealingPlayer, HealingOther, DamageAbsorb, HealAbsorb, and overflow indicators  
+[Full Documentation →](/elements/health)
+
+### Power
+
+Shows the unit's power (mana, energy, rage, etc.) with support for alternative power and cost prediction.
+
+**Widget**: StatusBar  
+**Sub-widgets**: CostPrediction  
+[Full Documentation →](/elements/power)
+
+### AdditionalPower
+
+Displays additional power types for specific classes (e.g., Druid mana while in form).
+
+**Widget**: StatusBar  
+**Events**: UNIT_POWER_UPDATE, UNIT_DISPLAYPOWER, UNIT_POWER_BAR_SHOW, UNIT_POWER_BAR_HIDE
+
+### AlternativePower
+
+Shows encounter-specific or vehicle power bars.
+
+**Widget**: StatusBar  
+**Sub-widgets**: Text (FontString)  
+**Events**: UNIT_POWER_UPDATE, UNIT_POWER_BAR_SHOW, UNIT_POWER_BAR_HIDE
+
+## Aura Elements
+
+Elements for displaying buffs and debuffs.
+
+### Auras
+
+Combined container for both buffs and debuffs with extensive filtering and sorting options.
+
+**Widget**: Frame  
+**Options**: numBuffs, numDebuffs, numTotal, gap, size, spacing, growth direction  
+[Full Documentation →](/elements/auras)
+
+### Buffs
+
+Separate container for buffs only.
+
+**Widget**: Frame  
+**Options**: num, size, spacing, filter  
+[Full Documentation →](/elements/auras)
+
+### Debuffs
+
+Separate container for debuffs only.
+
+**Widget**: Frame  
+**Options**: num, size, spacing, filter  
+[Full Documentation →](/elements/auras)
+
+### PrivateAuras
+
+Displays private auras (solo shuffle, etc.).
+
+**Widget**: Frame  
+**Options**: num, size, spacing, tooltipAnchor  
+**Events**: UNIT_AURA, PLAYER_SPECIALIZATION_CHANGED
+
+## Casting Elements
+
+### Castbar
+
+Displays spell casting and channeling progress with support for empowered casts.
+
+**Widget**: StatusBar  
+**Sub-widgets**: Icon, SafeZone, Shield, Spark, Text, Time  
+[Full Documentation →](/elements/castbar)
+
+## Class Resource Elements
+
+### ClassPower
+
+Displays class-specific resources: combo points, chi, holy power, soul shards, arcane charges, etc.
+
+**Widget**: Table of StatusBars  
+**Supported Classes**: All (combo points), Demon Hunter, Druid, Evoker, Mage, Monk, Paladin, Rogue, Shaman, Warlock  
+[Full Documentation →](/elements/classpower)
+
+### Runes
+
+Shows Death Knight runes with cooldown tracking.
+
+**Widget**: Table of StatusBars or Frames  
+**Options**: colorSpec (color by specialization)  
+**Events**: RUNE_POWER_UPDATE
+
+### Stagger
+
+Displays Brewmaster Monk stagger amount.
+
+**Widget**: StatusBar  
+**Events**: UNIT_MAXHEALTH, UNIT_AURA  
+**Spec**: Brewmaster Monk only
+
+### Totems
+
+Shows Shaman totem timers.
+
+**Widget**: Table of StatusBars or Frames  
+**Events**: PLAYER_TOTEM_UPDATE  
+**Class**: Shaman only
+
+## Prediction Elements
+
+### HealthPrediction
+
+Visualizes incoming heals, damage absorbs, and heal absorbs (separate from Health element).
+
+**Widget**: Frame container  
+**Sub-widgets**: myBar, otherBar, absorbBar, healAbsorbBar, overAbsorb, overHealAbsorb  
+**Events**: UNIT_HEALTH, UNIT_MAXHEALTH, UNIT_HEAL_PREDICTION, UNIT_ABSORB_AMOUNT_CHANGED, UNIT_HEAL_ABSORB_AMOUNT_CHANGED
+
+### PowerPrediction
+
+Shows predicted power cost for casting spells.
+
+**Widget**: StatusBar  
+**Events**: UNIT_SPELLCAST_START, UNIT_SPELLCAST_STOP, UNIT_SPELLCAST_FAILED, UNIT_DISPLAYPOWER  
+**Unit**: Player only
+
+## Visual Elements
+
+### Portrait
+
+Displays the unit's portrait as a 2D texture or 3D model.
+
+**Widget**: PlayerModel or Texture  
+**Options**: showClass  
+[Full Documentation →](/elements/portrait)
+
+### Range
+
+Fades the frame based on the unit's range.
+
+**Widget**: Inherited (affects entire frame)  
+**Options**: insideAlpha, outsideAlpha  
+**Events**: PLAYER_TARGET_CHANGED, plus OnUpdate for eventless frames
+
+## Text Elements
+
+### Tags
+
+Flexible text display system using tag strings for dynamic information.
+
+**Widget**: FontString  
+**Usage**: `frame:Tag(fontstring, '[tagstring]')`  
+[Full Documentation →](/elements/tags)
+
+## Indicator Elements
+
+Small texture indicators for various statuses. [See all indicators →](/elements/indicators)
+
+### Status Indicators
+
+<AccordionGroup>
+  <Accordion title="LeaderIndicator">
+    Shows if the unit is a group leader or guide.
+    
+    **Widget**: Texture  
+    **Events**: UNIT_FLAGS, PARTY_LEADER_CHANGED, GROUP_ROSTER_UPDATE
+  </Accordion>
+
+  <Accordion title="AssistantIndicator">
+    Shows if the unit is a raid assistant.
+    
+    **Widget**: Texture  
+    **Events**: PARTY_LEADER_CHANGED, GROUP_ROSTER_UPDATE
+  </Accordion>
+
+  <Accordion title="RaidRoleIndicator">
+    Displays main tank or main assist assignment.
+    
+    **Widget**: Texture  
+    **Events**: GROUP_ROSTER_UPDATE
+  </Accordion>
+
+  <Accordion title="GroupRoleIndicator">
+    Shows tank, healer, or DPS role.
+    
+    **Widget**: Texture  
+    **Events**: GROUP_ROSTER_UPDATE
+  </Accordion>
+
+  <Accordion title="CombatIndicator">
+    Indicates if the unit is in combat.
+    
+    **Widget**: Texture  
+    **Events**: PLAYER_REGEN_DISABLED, PLAYER_REGEN_ENABLED  
+    **Unit**: Player only
+  </Accordion>
+
+  <Accordion title="RestingIndicator">
+    Shows if the player is resting.
+    
+    **Widget**: Texture  
+    **Events**: PLAYER_UPDATE_RESTING  
+    **Unit**: Player only
+  </Accordion>
+</AccordionGroup>
+
+### PvP Indicators
+
+<AccordionGroup>
+  <Accordion title="PvPIndicator">
+    Displays PvP status, faction, and honor level.
+    
+    **Widget**: Texture  
+    **Sub-widgets**: Badge  
+    **Events**: UNIT_FACTION, HONOR_LEVEL_UPDATE
+  </Accordion>
+
+  <Accordion title="PvPClassificationIndicator">
+    Shows War Mode or PvP classification.
+    
+    **Widget**: Texture  
+    **Events**: UNIT_FACTION, UNIT_FLAGS_CHANGED
+  </Accordion>
+</AccordionGroup>
+
+### Party/Raid Indicators
+
+<AccordionGroup>
+  <Accordion title="ReadyCheckIndicator">
+    Shows ready check status with automatic fade-out.
+    
+    **Widget**: Texture  
+    **Options**: finishedTime, fadeTime  
+    **Events**: READY_CHECK, READY_CHECK_CONFIRM, READY_CHECK_FINISHED  
+    **Units**: Party and raid only
+  </Accordion>
+
+  <Accordion title="PhaseIndicator">
+    Indicates when the unit is in a different phase.
+    
+    **Widget**: Texture  
+    **Events**: UNIT_PHASE, PARTY_MEMBER_ENABLE, PARTY_MEMBER_DISABLE
+  </Accordion>
+
+  <Accordion title="SummonIndicator">
+    Shows if the unit has a pending summon.
+    
+    **Widget**: Texture  
+    **Events**: INCOMING_SUMMON_CHANGED
+  </Accordion>
+
+  <Accordion title="ResurrectIndicator">
+    Shows if the unit has a pending resurrection.
+    
+    **Widget**: Texture  
+    **Events**: INCOMING_RESURRECT_CHANGED
+  </Accordion>
+</AccordionGroup>
+
+### Target Indicators
+
+<AccordionGroup>
+  <Accordion title="RaidTargetIndicator">
+    Displays raid target icons (skull, cross, square, etc.).
+    
+    **Widget**: Texture  
+    **Events**: RAID_TARGET_UPDATE
+  </Accordion>
+
+  <Accordion title="QuestIndicator">
+    Shows if the unit is quest-related.
+    
+    **Widget**: Texture  
+    **Events**: UNIT_QUEST_LOG_CHANGED
+  </Accordion>
+</AccordionGroup>
+
+### Threat Indicator
+
+<AccordionGroup>
+  <Accordion title="ThreatIndicator">
+    Color-coded visualization of threat status.
+    
+    **Widget**: Texture (typically used as border/glow)  
+    **Events**: UNIT_THREAT_SITUATION_UPDATE, UNIT_THREAT_LIST_UPDATE
+  </Accordion>
+</AccordionGroup>
+
+## Element Categories
+
+### Must-Have Elements
+
+Essential for functional frames:
+- Health
+- Power
+- Name (via Tags)
+
+### Common Elements
+
+Frequently used:
+- Auras/Buffs/Debuffs
+- Castbar
+- Portrait
+- Health/Power values (via Tags)
+
+### Class-Specific
+
+Only relevant for certain classes:
+- ClassPower
+- Runes (Death Knight)
+- Stagger (Brewmaster Monk)
+- Totems (Shaman)
+- AdditionalPower (Druids, Priests)
+
+### Situational
+
+Useful in specific contexts:
+- ReadyCheckIndicator (raids)
+- RaidRoleIndicator (raids)
+- RaidTargetIndicator (all content)
+- Range (healers, ranged DPS)
+
+### Advanced
+
+For sophisticated layouts:
+- HealthPrediction
+- PowerPrediction
+- PrivateAuras
+- AlternativePower
+
+## Element Compatibility
+
+### Mutually Exclusive
+
+Use one or the other, not both:
+- **Auras** vs **Buffs + Debuffs**: Auras combines both; use separate Buffs/Debuffs for independent positioning
+- **Health with sub-widgets** vs **HealthPrediction**: Health element includes prediction features
+
+### Complementary Pairs
+
+Work well together:
+- Health + Power
+- Castbar + ClassPower
+- Portrait + Tags
+- Auras + RaidTargetIndicator
+
+### Unit Restrictions
+
+Some elements only work for specific units:
+- **Player only**: ClassPower, Runes, Stagger, Totems, CombatIndicator, RestingIndicator, AdditionalPower
+- **Party/Raid only**: ReadyCheckIndicator
+- **Not for \_target units**: Castbar
+
+## Performance Considerations
+
+### Light Elements
+
+Minimal performance impact:
+- All indicator textures
+- Tags (if not using frequentUpdates)
+- Power
+- Health
+
+### Medium Elements
+
+Moderate performance impact:
+- Auras (depends on num displayed)
+- Castbar
+- Portrait (2D)
+
+### Heavy Elements
+
+Higher performance cost:
+- Portrait (3D PlayerModel)
+- HealthPrediction with many sub-widgets
+- Auras with high num + frequent updates
+- Range (uses OnUpdate)
+
+<Tip>
+  Start with essential elements (Health, Power, Name) and add others based on your needs. Not every frame needs every element.
+</Tip>
+
+<Note>
+  All elements are optional. oUF will only enable elements that you explicitly add to your frames.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Element Overview" icon="book" href="/elements/overview">
+    Learn how elements work
+  </Card>
+  <Card title="Health Element" icon="heart" href="/elements/health">
+    Start with the health bar
+  </Card>
+  <Card title="Auras Element" icon="sparkles" href="/elements/auras">
+    Display buffs and debuffs
+  </Card>
+  <Card title="Indicators" icon="circle-check" href="/elements/indicators">
+    Add status indicators
+  </Card>
+</CardGroup>

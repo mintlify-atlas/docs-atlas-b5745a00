@@ -1,0 +1,442 @@
+---
+title: 'oUF Core API'
+description: 'Main oUF API methods for style registration, spawning frames, and managing elements'
+---
+
+## Overview
+
+The oUF core API provides the primary methods for registering styles, spawning unit frames, creating group headers, and managing elements. All methods are called on the global `oUF` object.
+
+---
+
+## Style Management
+
+### RegisterStyle
+
+Registers a style function with oUF. This will also set the active style if it hasn't been set yet.
+
+```lua
+oUF:RegisterStyle(name, func)
+```
+
+<ParamField path="name" type="string" required>
+  Unique name for the style
+</ParamField>
+
+<ParamField path="func" type="function | table" required>
+  Function or table of functions defining the style. The function receives `(frame, unit, isSingle)` as parameters:
+  - `frame` - the unit frame being styled
+  - `unit` - the unit type (e.g., "player", "target", "raid1")
+  - `isSingle` - `true` if spawned via `:Spawn()`, `false` if from `:SpawnHeader()`
+</ParamField>
+
+<Note>
+  If a style with the same name already exists, this method will fail with an error.
+</Note>
+
+**Example:**
+
+```lua
+local function MyStyle(frame, unit)
+  -- Create health bar
+  local Health = CreateFrame('StatusBar', nil, frame)
+  Health:SetAllPoints()
+  Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Health.colorHealth = true
+  frame.Health = Health
+end
+
+oUF:RegisterStyle('MyLayout', MyStyle)
+```
+
+---
+
+### SetActiveStyle
+
+Sets the currently active style. Newly spawned frames will use this style.
+
+```lua
+oUF:SetActiveStyle(name)
+```
+
+<ParamField path="name" type="string" required>
+  Name of a previously registered style
+</ParamField>
+
+**Example:**
+
+```lua
+oUF:SetActiveStyle('MyLayout')
+```
+
+---
+
+### GetActiveStyle
+
+Returns the name of the currently active style.
+
+```lua
+local styleName = oUF:GetActiveStyle()
+```
+
+<ResponseField name="styleName" type="string">
+  The name of the active style
+</ResponseField>
+
+---
+
+### IterateStyles
+
+Returns an iterator over all registered style names.
+
+```lua
+for styleName in oUF:IterateStyles() do
+  print(styleName)
+end
+```
+
+<Note>
+  This only returns style names, not the style functions themselves.
+</Note>
+
+---
+
+## Spawning Frames
+
+### Spawn
+
+Creates a single unit frame and applies the currently active style to it.
+
+```lua
+local frame = oUF:Spawn(unit, overrideName)
+```
+
+<ParamField path="unit" type="string" required>
+  The frame's unit identifier (e.g., "player", "target", "party1", "boss1")
+</ParamField>
+
+<ParamField path="overrideName" type="string">
+  Custom global name for the frame. If not provided, oUF will auto-generate a name based on the unit and active style (e.g., "oUF_MyLayoutPlayer")
+</ParamField>
+
+<ResponseField name="frame" type="Frame">
+  The created unit frame with all methods from the [Frame Methods API](/api/frame-methods)
+</ResponseField>
+
+<Note>
+  Frames inherit from `SecureUnitButtonTemplate` and `PingableUnitFrameTemplate` for full secure button and ping support.
+</Note>
+
+**Attributes:**
+
+Frames created with `:Spawn()` support these custom attributes:
+
+- `oUF-enableArenaPrep` (boolean) - Toggles arena prep support (default: `true`)
+
+**Example:**
+
+```lua
+oUF:RegisterStyle('MyLayout', MyStyleFunc)
+oUF:SetActiveStyle('MyLayout')
+
+local player = oUF:Spawn('player')
+local target = oUF:Spawn('target')
+local focus = oUF:Spawn('focus', 'MyCustomFocusFrame')
+
+player:SetPoint('CENTER', -220, -150)
+target:SetPoint('CENTER', 220, -150)
+```
+
+---
+
+### SpawnHeader
+
+Creates a group header (party/raid frames) and applies the currently active style to all units.
+
+```lua
+local header = oUF:SpawnHeader(overrideName, template, ...)
+```
+
+<ParamField path="overrideName" type="string">
+  Custom global name for the header. If not provided, oUF will auto-generate a name based on the active style and attributes
+</ParamField>
+
+<ParamField path="template" type="string">
+  Template to use for creating the header. Defaults to `'SecureGroupHeaderTemplate'`. Use `'SecureGroupPetHeaderTemplate'` for pet frames
+</ParamField>
+
+<ParamField path="..." type="string | table">
+  Attribute pairs or a table of attributes. See [SecureGroupHeaderTemplate](https://warcraft.wiki.gg/wiki/SecureGroupHeaderTemplate) for standard attributes.
+  
+  Can be provided as:
+  - Key-value pairs: `'showRaid', true, 'showParty', true`
+  - A single table: `{ showRaid = true, showParty = true }`
+</ParamField>
+
+<ResponseField name="header" type="Frame">
+  The created header frame with additional methods:
+  - `SetVisibility(visibility)` - Sets visibility conditions
+</ResponseField>
+
+**Custom oUF Attributes:**
+
+- `oUF-initialConfigFunction` (string) - Lua code executed during secure initialization
+- `oUF-onlyProcessChildren` (boolean) - Forces the header to only process child frames
+
+**Common Attributes:**
+
+- `showRaid` (boolean) - Show raid frames
+- `showParty` (boolean) - Show party frames
+- `showPlayer` (boolean) - Include player in party
+- `showSolo` (boolean) - Show when solo
+- `groupFilter` (string|number) - Filter by group ("1,2,3", "MAINTANK", "MAINASSIST")
+- `maxColumns` (number) - Maximum columns
+- `unitsPerColumn` (number) - Units per column
+- `columnSpacing` (number) - Spacing between columns
+- `yOffset` (number) - Vertical offset between frames
+- `point` (string) - Anchor point for growth direction
+
+**Example:**
+
+```lua
+-- Party frames
+local party = oUF:SpawnHeader(
+  'oUF_Party',
+  nil,
+  'showParty', true,
+  'showPlayer', true,
+  'yOffset', -5
+)
+party:SetPoint('TOPLEFT', 20, -20)
+
+-- Raid frames using a table
+local raid = oUF:SpawnHeader(nil, nil, {
+  showRaid = true,
+  groupFilter = '1,2,3,4,5',
+  maxColumns = 5,
+  unitsPerColumn = 5,
+  columnSpacing = 5,
+  yOffset = -5,
+  point = 'TOP'
+})
+raid:SetPoint('TOPLEFT', UIParent, 'TOPLEFT', 20, -20)
+```
+
+---
+
+### SpawnNamePlates
+
+Creates a nameplate driver that applies the currently active style to all nameplates.
+
+```lua
+local driver = oUF:SpawnNamePlates(prefix)
+```
+
+<ParamField path="prefix" type="string">
+  Prefix for the global name of nameplate frames. Defaults to an auto-generated prefix based on the active style
+</ParamField>
+
+<ResponseField name="driver" type="Frame">
+  The nameplate driver frame with methods for customization
+</ResponseField>
+
+<Warning>
+  This can only be called once per addon. Attempting to call it multiple times will result in an error.
+</Warning>
+
+**Driver Methods:**
+
+```lua
+-- Set callbacks
+driver:SetTargetCallback(function(nameplate, event, unit))
+driver:SetAddedCallback(function(nameplate, event, unit))
+driver:SetRemovedCallback(function(nameplate, event, unit))
+
+-- Configure nameplates
+driver:SetSize(width, height)  -- Default: 200, 30
+driver:SetEnemyInteractible(state)  -- Default: true
+driver:SetFriendlyInteractible(state)  -- Default: true
+driver:SetCVars(name, value, ...)  -- or SetCVars({ name = value })
+```
+
+**Example:**
+
+```lua
+local nameplates = oUF:SpawnNamePlates('oUF_MyPlates')
+
+nameplates:SetSize(120, 24)
+nameplates:SetAddedCallback(function(plate, event, unit)
+  print('Nameplate added:', unit)
+end)
+```
+
+---
+
+## Elements
+
+### AddElement
+
+Registers a custom element with oUF, making it available to all unit frames.
+
+```lua
+oUF:AddElement(name, update, enable, disable)
+```
+
+<ParamField path="name" type="string" required>
+  Unique name for the element
+</ParamField>
+
+<ParamField path="update" type="function">
+  Function called when the element should update. Receives `(frame, event, unit)` as parameters.
+  
+  Can be `nil` if the element doesn't need update calls.
+</ParamField>
+
+<ParamField path="enable" type="function" required>
+  Function called when the element is enabled for a frame. Receives `(frame, unit)` as parameters.
+  
+  Must return `true` to indicate successful enablement.
+</ParamField>
+
+<ParamField path="disable" type="function" required>
+  Function called when the element is disabled for a frame. Receives `(frame)` as parameter.
+</ParamField>
+
+<Note>
+  Once registered, the element will be automatically enabled on all newly spawned frames if the frame has a table/frame with the element's name.
+</Note>
+
+**Example:**
+
+```lua
+local Update = function(frame, event, unit)
+  if unit ~= frame.unit then return end
+  
+  local element = frame.MyElement
+  local inCombat = UnitAffectingCombat(unit)
+  
+  if inCombat then
+    element:SetBackdropBorderColor(1, 0, 0)
+  else
+    element:SetBackdropBorderColor(0, 1, 0)
+  end
+end
+
+local Enable = function(frame, unit)
+  local element = frame.MyElement
+  if not element then return end
+  
+  frame:RegisterEvent('PLAYER_REGEN_DISABLED', Update, true)
+  frame:RegisterEvent('PLAYER_REGEN_ENABLED', Update, true)
+  
+  return true
+end
+
+local Disable = function(frame)
+  frame:UnregisterEvent('PLAYER_REGEN_DISABLED', Update)
+  frame:UnregisterEvent('PLAYER_REGEN_ENABLED', Update)
+end
+
+oUF:AddElement('MyElement', Update, Enable, Disable)
+```
+
+---
+
+## Utility Methods
+
+### RegisterInitCallback
+
+Adds a function to be executed when any unit frame or header is initialized.
+
+```lua
+oUF:RegisterInitCallback(func)
+```
+
+<ParamField path="func" type="function" required>
+  Function to call on initialization. Receives the initialized frame as a parameter.
+</ParamField>
+
+**Example:**
+
+```lua
+oUF:RegisterInitCallback(function(frame)
+  print('Frame initialized:', frame:GetName())
+  -- Perform additional setup
+end)
+```
+
+---
+
+### RegisterMetaFunction
+
+Makes a function or table of functions available to all unit frames.
+
+```lua
+oUF:RegisterMetaFunction(name, func)
+```
+
+<ParamField path="name" type="string" required>
+  Unique name for the function
+</ParamField>
+
+<ParamField path="func" type="function | table" required>
+  Function or table of functions to add to all frames
+</ParamField>
+
+**Example:**
+
+```lua
+oUF:RegisterMetaFunction('MyCustomMethod', function(self, ...)
+  -- Can now be called on any frame
+  print('Called on:', self:GetName())
+end)
+
+-- Later, on any frame:
+frame:MyCustomMethod()
+```
+
+---
+
+## Properties
+
+### oUF.version
+
+The current version of oUF.
+
+```lua
+print('oUF version:', oUF.version)
+```
+
+---
+
+### oUF.objects
+
+Array containing all unit frames created by `:Spawn()`.
+
+```lua
+for _, frame in ipairs(oUF.objects) do
+  print('Frame:', frame:GetName(), 'Unit:', frame.unit)
+end
+```
+
+---
+
+### oUF.headers
+
+Array containing all group headers created by `:SpawnHeader()`.
+
+```lua
+for _, header in ipairs(oUF.headers) do
+  print('Header:', header:GetName())
+end
+```
+
+---
+
+### oUF.colors
+
+The color tables used by elements. See [Colors API](/api/colors) for details.
+
+```lua
+local r, g, b = oUF.colors.class['WARRIOR']:GetRGB()
+```

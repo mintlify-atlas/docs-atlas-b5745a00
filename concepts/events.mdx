@@ -1,0 +1,730 @@
+---
+title: Events
+description: Event-driven updates, event registration, handlers, and unit event filtering
+---
+
+## Event-Driven Architecture
+
+oUF uses World of Warcraft's event system to update frames when game state changes. Instead of polling (checking data every frame), oUF responds to specific events, making it efficient and responsive.
+
+```lua
+-- When player health changes, WoW fires an event
+-- oUF receives: UNIT_HEALTH, 'player'
+-- Health element updates automatically
+```
+
+## Event Types
+
+### Unit Events
+
+Events that fire for specific units:
+
+```lua
+UNIT_HEALTH           -- (unit) Health changed
+UNIT_POWER_UPDATE     -- (unit, powerType) Power changed
+UNIT_AURA             -- (unit, updateInfo) Auras changed
+UNIT_TARGET           -- (unit) Target changed
+UNIT_MAXHEALTH        -- (unit) Max health changed
+UNIT_ENTERED_VEHICLE  -- (unit) Entered vehicle
+UNIT_EXITED_VEHICLE   -- (unit) Exited vehicle
+```
+
+<Info>
+Unit events include the unit string as the first parameter, allowing oUF to filter updates to only relevant frames.
+</Info>
+
+### Unitless Events
+
+Events that don't refer to specific units:
+
+```lua
+PLAYER_ENTERING_WORLD    -- Login, zone change, reload
+PLAYER_TARGET_CHANGED    -- Player's target changed
+PLAYER_REGEN_ENABLED     -- Left combat
+PLAYER_REGEN_DISABLED    -- Entered combat
+GROUP_ROSTER_UPDATE      -- Party/raid composition changed
+NAME_PLATE_UNIT_ADDED    -- (unit) Nameplate appeared
+NAME_PLATE_UNIT_REMOVED  -- (unit) Nameplate disappeared
+```
+
+### Shared Events
+
+Events that can be registered as either unit or unitless:
+
+```lua
+-- As unit event
+self:RegisterEvent('UNIT_PORTRAIT_UPDATE', handler)
+
+-- As unitless event
+self:RegisterEvent('UNIT_PORTRAIT_UPDATE', handler, true)
+```
+
+## Event Registration
+
+### Standard Registration
+
+oUF extends the standard frame event system:
+
+```lua
+frame:RegisterEvent(event, func, unitless)
+```
+
+**Parameters:**
+- `event` (string) - Event name to register
+- `func` (function) - Handler function to call when event fires
+- `unitless` (boolean) - If true, register as unitless event (optional)
+
+**Example:**
+
+```lua
+-- Unit event (default)
+self:RegisterEvent('UNIT_HEALTH', UpdateHealth)
+
+-- Unitless event
+self:RegisterEvent('PLAYER_TARGET_CHANGED', UpdateTarget, true)
+```
+
+### Automatic Unit Filtering
+
+When you register a unit event, oUF automatically filters to the frame's unit:
+
+```lua
+-- In Health element Enable function
+self:RegisterEvent('UNIT_HEALTH', Path)
+
+-- oUF internally does:
+self:RegisterUnitEvent('UNIT_HEALTH', self.unit)
+
+-- Event only fires when THIS unit's health changes
+```
+
+From `events.lua:95-154`:
+
+```lua
+function frame_metatable.__index:RegisterEvent(event, func, unitless)
+    if unitless or self.__eventless then
+        -- Register as standard event
+        registerEvent(self, event)
+    else
+        -- Register as unit event
+        self.unitEvents = self.unitEvents or {}
+        self.unitEvents[event] = true
+        
+        local unit1, unit2 = self.unit
+        if unit1 and validateEventUnit(unit1) then
+            -- Handle secondary units (e.g., pet needs player)
+            if secondaryUnits[event] then
+                unit2 = secondaryUnits[event][unit1]
+            end
+            
+            registerUnitEvent(self, event, unit1, unit2 or '')
+        end
+    end
+end
+```
+
+<Note>
+Unit events are automatically re-registered when the frame's unit changes (e.g., vehicle transitions).
+</Note>
+
+### Multiple Handlers
+
+Multiple functions can handle the same event:
+
+```lua
+-- First handler
+self:RegisterEvent('UNIT_HEALTH', function(self, event, unit)
+    print('Handler 1:', unit)
+end)
+
+-- Second handler
+self:RegisterEvent('UNIT_HEALTH', function(self, event, unit)
+    print('Handler 2:', unit)
+end)
+
+-- Both execute when event fires
+```
+
+From `events.lua:104-115`:
+
+```lua
+local curev = self[event]
+if curev then
+    if type(curev) == 'function' and curev ~= func then
+        -- Convert to table of functions
+        self[event] = setmetatable({curev, func}, event_metatable)
+    elseif type(curev) == 'table' then
+        -- Add to existing table
+        table.insert(curev, func)
+    end
+end
+```
+
+## Event Unregistration
+
+### Removing Handlers
+
+Unregister specific handler functions:
+
+```lua
+frame:UnregisterEvent(event, func)
+```
+
+**Example:**
+
+```lua
+local function MyHandler(self, event, unit)
+    print('Event:', event, unit)
+end
+
+-- Register
+self:RegisterEvent('UNIT_HEALTH', MyHandler)
+
+-- Unregister specific handler
+self:UnregisterEvent('UNIT_HEALTH', MyHandler)
+```
+
+### Removing All Handlers
+
+Unregister event entirely:
+
+```lua
+-- Unregister event (removes all handlers)
+self:UnregisterEvent('UNIT_HEALTH')
+```
+
+From `events.lua:164-191`:
+
+```lua
+function frame_metatable.__index:UnregisterEvent(event, func)
+    local curev = self[event]
+    
+    if type(curev) == 'table' and func then
+        -- Remove specific function from table
+        for k, infunc in next, curev do
+            if infunc == func then
+                curev[k] = nil
+                break
+            end
+        end
+        
+        if not next(curev) then
+            cleanUp = true
+        end
+    end
+    
+    if cleanUp or curev == func then
+        -- Remove event entirely
+        self[event] = nil
+        if self.unitEvents then
+            self.unitEvents[event] = nil
+        end
+        unregisterEvent(self, event)
+    end
+end
+```
+
+## Event Handler Pattern
+
+### Standard Handler
+
+Typical event handler structure:
+
+```lua
+local function Update(self, event, unit, ...)
+    -- 1. Validate unit
+    if not unit or self.unit ~= unit then return end
+    
+    local element = self.MyElement
+    
+    -- 2. PreUpdate callback
+    if element.PreUpdate then
+        element:PreUpdate(unit)
+    end
+    
+    -- 3. Fetch data
+    local data = GetUnitData(unit)
+    
+    -- 4. Update display
+    element:SetValue(data)
+    
+    -- 5. PostUpdate callback  
+    if element.PostUpdate then
+        element:PostUpdate(unit, data)
+    end
+end
+```
+
+### Path Function
+
+Wrap handler to support overrides:
+
+```lua
+local function Path(self, ...)
+    -- Allow layouts to override
+    return (self.MyElement.Override or Update)(self, ...)
+end
+
+-- Register the Path function
+self:RegisterEvent('UNIT_HEALTH', Path)
+```
+
+### Event Dispatcher
+
+oUF's core event dispatcher:
+
+```lua
+-- From events.lua:70-74
+local function onEvent(self, event, ...)
+    if self:IsVisible() then
+        return self[event](self, event, ...)
+    end
+end
+```
+
+When an event fires:
+1. Check if frame is visible
+2. Look up event name as method on frame
+3. Call handler with event and arguments
+
+## Secondary Units
+
+Some events require both primary and secondary units:
+
+```lua
+-- Pet events need player unit too
+UNIT_ENTERED_VEHICLE  -- Primary: pet, Secondary: player
+UNIT_EXITED_VEHICLE   -- Primary: pet, Secondary: player  
+UNIT_PET              -- Primary: pet, Secondary: player
+```
+
+From `events.lua:19-29`:
+
+```lua
+local secondaryUnits = {
+    UNIT_ENTERED_VEHICLE = {
+        pet = 'player',
+    },
+    UNIT_EXITED_VEHICLE = {
+        pet = 'player',
+    },
+    UNIT_PET = {
+        pet = 'player',
+    },
+}
+```
+
+oUF automatically registers both units:
+
+```lua
+-- From events.lua:142-150
+if secondaryUnits[event] then
+    unit2 = secondaryUnits[event][unit1]
+end
+
+registerUnitEvent(self, event, unit1, unit2 or '')
+```
+
+<Info>
+You don't need to handle secondary units manually - oUF does this automatically.
+</Info>
+
+## Unit Event Re-registration
+
+When a frame's unit changes, unit events are re-registered:
+
+```lua
+-- From events.lua:31-68
+function Private.UpdateUnits(frame, unit, realUnit)
+    if frame.unitEvents and validateEventUnit(unit) then
+        for event in next, frame.unitEvents do
+            -- Get secondary unit if needed
+            if secondaryUnits[event] then
+                realUnit = secondaryUnits[event][unit]
+            end
+            
+            local registered, unit1, unit2 = isEventRegistered(frame, event)
+            
+            -- Re-register if unit changed
+            if not registered or unit1 ~= unit or unit2 ~= realUnit then
+                registerUnitEvent(frame, event, unit, realUnit)
+            end
+        end
+    end
+    
+    frame.unit = unit
+    frame.realUnit = realUnit
+    frame.id = unit:match('^.-(%d+)')
+    
+    return true
+end
+```
+
+## Core Events
+
+### Frame Lifecycle Events
+
+oUF registers these automatically:
+
+```lua
+-- From ouf.lua:273-285
+object:RegisterEvent('PLAYER_ENTERING_WORLD', evalUnitAndUpdate, true)
+
+if not objectUnit:match('%w+target') then
+    object:RegisterEvent('UNIT_ENTERED_VEHICLE', evalUnitAndUpdate)
+    object:RegisterEvent('UNIT_EXITED_VEHICLE', evalUnitAndUpdate)
+    
+    if objectUnit ~= 'player' then
+        object:RegisterEvent('UNIT_PET', updatePet)
+    end
+end
+
+if header then
+    object:RegisterEvent('GROUP_ROSTER_UPDATE', updateRaid, true)
+end
+```
+
+**Key Events:**
+- `PLAYER_ENTERING_WORLD` - Force full update on login/reload
+- `UNIT_ENTERED_VEHICLE` - Handle vehicle entry
+- `UNIT_EXITED_VEHICLE` - Handle vehicle exit
+- `UNIT_PET` - Update when pet changes
+- `GROUP_ROSTER_UPDATE` - Update raid frames when roster changes
+
+### Update Triggers
+
+How events trigger updates:
+
+```lua
+-- From ouf.lua:52-56
+local function evalUnitAndUpdate(self, event)
+    if not updateActiveUnit(self, event) then
+        return self:UpdateAllElements(event)
+    end
+end
+```
+
+1. Check if unit changed
+2. If yes, update unit and run full update
+3. If no, just run full update
+
+## Element Event Patterns
+
+### Typical Element Events
+
+Common event registration in Enable:
+
+```lua
+local function Enable(self, unit)
+    local element = self.Health
+    if element then
+        -- Core data events
+        self:RegisterEvent('UNIT_HEALTH', Path)
+        self:RegisterEvent('UNIT_MAXHEALTH', Path)
+        
+        -- State events
+        self:RegisterEvent('UNIT_CONNECTION', Path)
+        
+        -- Group-specific events
+        if unit == 'party' or unit == 'raid' then
+            self:RegisterEvent('PARTY_MEMBER_ENABLE', Path)
+            self:RegisterEvent('PARTY_MEMBER_DISABLE', Path)
+        end
+        
+        -- Conditional events
+        if element.colorThreat then
+            self:RegisterEvent('UNIT_THREAT_LIST_UPDATE', ColorPath)
+        end
+        
+        return true
+    end
+end
+```
+
+### Color Update Events
+
+Separate events for visual updates:
+
+```lua
+-- From health.lua:509-519
+if element.colorSelection then
+    self:RegisterEvent('UNIT_FLAGS', ColorPath)
+end
+
+if element.colorTapping or element.colorReaction then
+    self:RegisterEvent('UNIT_FACTION', ColorPath)
+end
+
+if element.colorThreat then
+    self:RegisterEvent('UNIT_THREAT_LIST_UPDATE', ColorPath)
+end
+```
+
+### Prediction Events
+
+Conditional events based on sub-widgets:
+
+```lua
+-- From health.lua:521-535
+if element.HealingAll or element.HealingPlayer or element.HealingOther then
+    self:RegisterEvent('UNIT_HEAL_PREDICTION', Path)
+end
+
+if element.DamageAbsorb then
+    self:RegisterEvent('UNIT_ABSORB_AMOUNT_CHANGED', Path)
+end
+
+if element.HealAbsorb then
+    self:RegisterEvent('UNIT_HEAL_ABSORB_AMOUNT_CHANGED', Path)
+end
+
+if element.TempLoss then
+    self:RegisterEvent('UNIT_MAX_HEALTH_MODIFIERS_CHANGED', Path)
+end
+```
+
+## Frequent vs Update Events
+
+Some elements offer update frequency control:
+
+```lua
+-- Power element
+if element.frequentUpdates then
+    self:RegisterEvent('UNIT_POWER_FREQUENT', Path)  -- Fires more often
+else
+    self:RegisterEvent('UNIT_POWER_UPDATE', Path)    -- Standard rate
+end
+```
+
+<Tip>
+Use frequent updates sparingly - they fire very often and can impact performance.
+</Tip>
+
+## Special Event Handling
+
+### Nameplate Events
+
+Nameplates use special events:
+
+```lua
+-- From ouf.lua:868-921
+function driverEventHandler(self, event, unit)
+    if event == 'NAME_PLATE_UNIT_ADDED' then
+        local nameplate = C_NamePlate.GetNamePlateForUnit(unit)
+        
+        if not nameplate.unitFrame then
+            -- Create frame
+            nameplate.unitFrame = CreateFrame('Button', ...)
+            Private.UpdateUnits(nameplate.unitFrame, unit)
+            walkObject(nameplate.unitFrame, unit)
+        end
+        
+        nameplate.unitFrame:SetAttribute('unit', unit)
+        nameplate.unitFrame:UpdateAllElements(event)
+        
+    elseif event == 'NAME_PLATE_UNIT_REMOVED' then
+        local nameplate = C_NamePlate.GetNamePlateForUnit(unit)
+        nameplate.unitFrame:SetAttribute('unit', nil)
+    end
+end
+```
+
+### Target Changed Events
+
+Player target changes:
+
+```lua
+-- From ouf.lua:857-867  
+if event == 'PLAYER_TARGET_CHANGED' then
+    local nameplate = C_NamePlate.GetNamePlateForUnit('target')
+    if not nameplate or not nameplate.unitFrame then return end
+    
+    if self.targetCallback then
+        self.targetCallback(nameplate.unitFrame, event, 'target')
+    end
+    
+    nameplate.unitFrame:UpdateAllElements(event)
+end
+```
+
+### Raid GUID Updates
+
+Detect when a unit replaces another in raid:
+
+```lua
+-- From ouf.lua:237-244
+local function updateRaid(self, event)
+    local unitGUID = UnitGUID(self.unit)
+    if unitGUID ~= nil and not issecretvalue(unitGUID) and unitGUID ~= self.unitGUID then
+        self.unitGUID = unitGUID
+        self:UpdateAllElements(event)
+    end
+end
+```
+
+## Event Blocking
+
+Eventless frames (polling instead of events):
+
+```lua
+-- From ouf.lua:99
+if self.__eventless and event ~= 'UNIT_PORTRAIT_UPDATE' and event ~= 'UNIT_MODEL_CHANGED' then
+    return  -- Block most events
+end
+```
+
+Target-suffix units are typically eventless:
+
+```lua
+-- targettarget, focustarget, party1target, etc.
+if unit:match('%w+target$') then
+    oUF:HandleEventlessUnit(object)
+end
+```
+
+<Note>
+Eventless units use OnUpdate polling for efficiency with rapidly changing targets.
+</Note>
+
+## Practical Examples
+
+### Basic Element Events
+
+```lua
+local function Update(self, event, unit)
+    if self.unit ~= unit then return end
+    
+    local value = UnitSomething(unit)
+    self.MyElement:SetText(value)
+end
+
+local function Enable(self, unit)
+    local element = self.MyElement
+    if element then
+        -- Register event with unit filtering
+        self:RegisterEvent('UNIT_SOMETHING', Update)
+        return true
+    end
+end
+
+local function Disable(self)
+    -- Clean up
+    self:UnregisterEvent('UNIT_SOMETHING', Update)
+end
+
+oUF:AddElement('MyElement', Update, Enable, Disable)
+```
+
+### Conditional Event Registration
+
+```lua
+local function Enable(self, unit)
+    local element = self.Power
+    if element then
+        -- Always register core events
+        self:RegisterEvent('UNIT_POWER_UPDATE', Path)
+        self:RegisterEvent('UNIT_MAXPOWER', Path)
+        
+        -- Conditional based on options
+        if element.frequentUpdates then
+            self:UnregisterEvent('UNIT_POWER_UPDATE', Path)
+            self:RegisterEvent('UNIT_POWER_FREQUENT', Path)
+        end
+        
+        -- Conditional based on unit
+        if UnitIsUnit(unit, 'player') then
+            self:RegisterEvent('UNIT_SPELLCAST_START', PredictionPath)
+        end
+        
+        return true
+    end
+end
+```
+
+### Multi-Handler Events
+
+```lua
+-- Color updates
+local function ColorPath(self, event, unit)
+    if self.unit ~= unit then return end
+    UpdateColor(self, event, unit)
+end
+
+-- Data updates  
+local function Path(self, event, unit)
+    if self.unit ~= unit then return end
+    Update(self, event, unit)
+    ColorPath(self, event, unit)  -- Also update color
+end
+
+-- Both handlers respond to same event
+self:RegisterEvent('UNIT_HEALTH', Path)
+self:RegisterEvent('UNIT_HEALTH', ColorPath)
+```
+
+## Event Best Practices
+
+<Tip>
+**Registration**
+- Register events in Enable, unregister in Disable
+- Use unit events for unit-specific data
+- Mark unitless events explicitly
+- Group related events together
+- Validate unit in handlers
+
+**Performance**
+- Only register events you need
+- Use frequent updates sparingly
+- Avoid redundant registrations
+- Unregister when not needed
+- Let oUF handle unit filtering
+
+**Reliability**
+- Always check unit matches
+- Handle nil units gracefully
+- Clean up in Disable
+- Test with unit changes
+- Handle edge cases
+</Tip>
+
+## Common Pitfalls
+
+<Warning>
+**Don't:**
+- Register events outside Enable/Disable
+- Forget to unregister in Disable
+- Register unit events as unitless
+- Ignore unit parameter in handlers
+- Register same handler multiple times
+
+**Do:**
+- Validate unit in every handler
+- Use Path wrapper for overrides
+- Handle secondary units (oUF does this)
+- Test unit changes (vehicle, target)
+- Check visibility before updating
+</Warning>
+
+## Debugging Events
+
+```lua
+-- Log all events for a frame
+local function DebugEvent(self, event, ...)
+    print('Event:', event, 'Args:', ...)
+    print('Unit:', self.unit, 'Real:', self.realUnit)
+end
+
+-- Attach to frame
+frame:SetScript('OnEvent', function(self, event, ...)
+    DebugEvent(self, event, ...)
+    -- Call original handler
+    return self[event](self, event, ...)
+end)
+```
+
+## Next Steps
+
+- Explore [Elements](/concepts/elements) for event usage
+- Learn [Architecture](/concepts/architecture) for event flow
+- Check [Units](/concepts/units) for unit validation
+- Read [Element Development](/guides/custom-elements) for custom events

@@ -1,0 +1,328 @@
+---
+title: 'Power Element'
+description: 'Display unit power bars for mana, energy, rage, and other resources'
+---
+
+## Overview
+
+The Power element displays a status bar representing the unit's current power (mana, energy, rage, focus, runic power, etc.). It supports alternative power sources, cost prediction for spell casting, and flexible coloring options.
+
+## Basic Usage
+
+```lua
+local Power = CreateFrame('StatusBar', nil, self)
+Power:SetHeight(15)
+Power:SetPoint('BOTTOM')
+Power:SetPoint('LEFT')
+Power:SetPoint('RIGHT')
+
+-- Configure options
+Power.colorPower = true
+Power.frequentUpdates = true
+
+-- Register with oUF
+self.Power = Power
+```
+
+## Widget
+
+<ParamField path="Power" type="StatusBar" required>
+  A StatusBar widget used to represent the unit's power. A default texture will be applied if one is not set.
+</ParamField>
+
+## Sub-Widgets
+
+<ParamField path="Power.CostPrediction" type="StatusBar">
+  Displays the predicted power cost of a spell being cast. Only works for the player unit.
+</ParamField>
+
+## Coloring Options
+
+The Power element uses priority-based coloring. The first matching option determines the color:
+
+<ParamField path="Power.colorDisconnected" type="boolean">
+  Use `self.colors.disconnected` if the unit is offline
+</ParamField>
+
+<ParamField path="Power.colorTapping" type="boolean">
+  Use `self.colors.tapped` if the unit is tapped by another player
+</ParamField>
+
+<ParamField path="Power.colorThreat" type="boolean">
+  Use `self.colors.threat[status]` based on threat status from [UnitThreatSituation](https://warcraft.wiki.gg/wiki/API_UnitThreatSituation)
+</ParamField>
+
+<ParamField path="Power.colorPower" type="boolean">
+  Use `self.colors.power[token]` based on the unit's power type. Falls back to alternative power colors from [UnitPowerType](https://warcraft.wiki.gg/wiki/API_UnitPowerType) if token color is not found.
+</ParamField>
+
+<ParamField path="Power.colorPowerAtlas" type="boolean">
+  Use atlas texture from `self.colors.power[token]` when available. Requires `.colorPower` to be enabled.
+</ParamField>
+
+<ParamField path="Power.colorPowerSmooth" type="boolean">
+  Use smooth gradient from `self.colors.power[token]` color curve based on current power percentage. Requires `.colorPower` to be enabled.
+</ParamField>
+
+<ParamField path="Power.colorClass" type="boolean">
+  Use `self.colors.class[class]` for player units
+</ParamField>
+
+<ParamField path="Power.colorClassNPC" type="boolean">
+  Use `self.colors.class[class]` for NPC units
+</ParamField>
+
+<ParamField path="Power.colorClassPet" type="boolean">
+  Use `self.colors.class[class]` for player-controlled non-player units
+</ParamField>
+
+<ParamField path="Power.colorSelection" type="boolean">
+  Use `self.colors.selection[type]` based on the unit's outline/highlight color
+</ParamField>
+
+<ParamField path="Power.considerSelectionInCombatHostile" type="boolean">
+  Consider selection as hostile while the unit is in combat with the player
+</ParamField>
+
+<ParamField path="Power.colorReaction" type="boolean">
+  Use `self.colors.reaction[reaction]` based on player reaction from [UnitReaction](https://warcraft.wiki.gg/wiki/API_UnitReaction)
+</ParamField>
+
+## Additional Options
+
+<ParamField path="Power.frequentUpdates" type="boolean">
+  Use UNIT_POWER_FREQUENT instead of UNIT_POWER_UPDATE for more frequent updates (useful for energy/focus)
+</ParamField>
+
+<ParamField path="Power.displayAltPower" type="boolean">
+  Display alternative power if the unit has one. By default, only raid and party units show alternative power.
+</ParamField>
+
+<ParamField path="Power.smoothing" type="number">
+  Status bar smoothing method. Defaults to `Enum.StatusBarInterpolation.Immediate`.
+  Use `Enum.StatusBarInterpolation.Smooth` for smooth animations.
+</ParamField>
+
+## Callbacks
+
+<ParamField path="Power:PreUpdate" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called before the element has been updated.
+  - `self` - the Power element
+  - `unit` - the unit being updated
+</ParamField>
+
+<ParamField path="Power:PostUpdate" type="function">
+  ```lua
+  function(self, unit, cur, min, max)
+  ```
+  Called after the element has been updated.
+  - `self` - the Power element
+  - `unit` - the unit being updated
+  - `cur` - current power value
+  - `min` - minimum possible power value
+  - `max` - maximum possible power value
+</ParamField>
+
+<ParamField path="Power:PostUpdateColor" type="function">
+  ```lua
+  function(self, unit, color, altR, altG, altB)
+  ```
+  Called after the element color has been updated.
+  - `self` - the Power element
+  - `unit` - the unit being updated
+  - `color` - the ColorMixin object used (if any)
+  - `altR`, `altG`, `altB` - alternative RGB color values (0-1 range)
+</ParamField>
+
+<ParamField path="Power:PreUpdatePrediction" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called before the cost prediction has been updated (player only).
+</ParamField>
+
+<ParamField path="Power:PostUpdatePrediction" type="function">
+  ```lua
+  function(self, unit, cost)
+  ```
+  Called after the cost prediction has been updated (player only).
+  - `cost` - predicted power cost of the casting spell
+</ParamField>
+
+## Overrides
+
+<ParamField path="Power.Override" type="function">
+  ```lua
+  function(self, event, unit)
+  ```
+  Completely override the internal update function.
+</ParamField>
+
+<ParamField path="Power.UpdateColor" type="function">
+  ```lua
+  function(self, event, unit)
+  ```
+  Completely override the color update function.
+</ParamField>
+
+<ParamField path="Power.OverridePrediction" type="function">
+  ```lua
+  function(self, event, unit)
+  ```
+  Completely override the cost prediction update function.
+</ParamField>
+
+<ParamField path="Power.GetDisplayPower" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Override to customize which power type to display. Should return the power type index and minimum value, or nil.
+</ParamField>
+
+## Example with Cost Prediction
+
+```lua
+-- Create power bar for player
+local Power = CreateFrame('StatusBar', nil, self)
+Power:SetHeight(15)
+Power:SetPoint('BOTTOM')
+Power:SetPoint('LEFT')
+Power:SetPoint('RIGHT')
+
+-- Configure coloring
+Power.colorPower = true
+Power.frequentUpdates = true
+Power.smoothing = Enum.StatusBarInterpolation.Smooth
+
+-- Add cost prediction
+local CostPrediction = CreateFrame('StatusBar', nil, Power)
+CostPrediction:SetReverseFill(true)
+CostPrediction:SetPoint('TOP')
+CostPrediction:SetPoint('BOTTOM')
+CostPrediction:SetPoint('RIGHT', Power:GetStatusBarTexture())
+CostPrediction:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+CostPrediction:SetStatusBarColor(0.8, 0.8, 0.8, 0.5)
+Power.CostPrediction = CostPrediction
+
+-- Register with oUF
+self.Power = Power
+```
+
+## Example with Background
+
+```lua
+local Power = CreateFrame('StatusBar', nil, self)
+Power:SetHeight(15)
+Power:SetPoint('BOTTOM', 0, 0)
+Power:SetPoint('LEFT', 2, 0)
+Power:SetPoint('RIGHT', -2, 0)
+
+Power.colorPower = true
+Power.frequentUpdates = true
+
+-- Add a background
+local bg = Power:CreateTexture(nil, 'BACKGROUND')
+bg:SetAllPoints()
+bg:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+bg.multiplier = 0.3
+Power.bg = bg
+
+-- Update background to match power color
+Power.PostUpdateColor = function(self, unit, color, r, g, b)
+    if r then
+        -- Using alternative RGB values
+        self.bg:SetVertexColor(r * self.bg.multiplier, g * self.bg.multiplier, b * self.bg.multiplier)
+    elseif color then
+        -- Using ColorMixin
+        local cr, cg, cb = color:GetRGB()
+        self.bg:SetVertexColor(cr * self.bg.multiplier, cg * self.bg.multiplier, cb * self.bg.multiplier)
+    end
+end
+
+self.Power = Power
+```
+
+## Example with Text Display
+
+```lua
+local Power = CreateFrame('StatusBar', nil, self)
+Power:SetHeight(15)
+Power:SetPoint('BOTTOM', self, 'BOTTOM', 0, 2)
+Power:SetPoint('LEFT', self, 'LEFT', 2, 0)
+Power:SetPoint('RIGHT', self, 'RIGHT', -2, 0)
+
+Power.colorPower = true
+Power.frequentUpdates = true
+
+-- Create text overlay
+local value = Power:CreateFontString(nil, 'OVERLAY')
+value:SetPoint('CENTER')
+value:SetFont('Fonts\\FRIZQT__.TTF', 11, 'OUTLINE')
+Power.value = value
+
+Power.PostUpdate = function(self, unit, cur, min, max)
+    -- Show current/max for mana, just current for energy/rage
+    local _, powerToken = UnitPowerType(unit)
+    
+    if powerToken == 'MANA' then
+        self.value:SetFormattedText('%d / %d', cur, max)
+    else
+        self.value:SetText(cur)
+    end
+end
+
+self.Power = Power
+```
+
+## Power Types
+
+The element automatically detects and colors various power types:
+
+- **MANA** - Mana (blue)
+- **RAGE** - Rage (red)
+- **FOCUS** - Focus (orange)
+- **ENERGY** - Energy (yellow)
+- **COMBO_POINTS** - Combo Points
+- **RUNES** - Runes (cyan)
+- **RUNIC_POWER** - Runic Power (cyan)
+- **SOUL_SHARDS** - Soul Shards (purple)
+- **LUNAR_POWER** - Astral Power (blue/purple)
+- **HOLY_POWER** - Holy Power (yellow)
+- **MAELSTROM** - Maelstrom (blue)
+- **CHI** - Chi (cyan)
+- **INSANITY** - Insanity (purple)
+- **ARCANE_CHARGES** - Arcane Charges (blue)
+- **FURY** - Fury (purple)
+- **PAIN** - Pain (orange)
+- And more...
+
+<Note>
+  Colors for each power type are defined in `oUF.colors.power` and can be customized.
+</Note>
+
+## Alternative Power
+
+Some encounters feature alternative power bars (e.g., vehicle power, encounter-specific resources):
+
+```lua
+local Power = CreateFrame('StatusBar', nil, self)
+Power:SetHeight(15)
+Power:SetPoint('BOTTOM', 0, 0)
+
+-- Enable alternative power display for all units
+Power.displayAltPower = true
+Power.colorPower = true
+
+self.Power = Power
+```
+
+<Tip>
+  Use `.frequentUpdates = true` for classes with quickly regenerating resources like Energy or Focus for smoother visual updates.
+</Tip>
+
+<Warning>
+  The `.displayAltPower` option is `false` by default. It will only show alternative power for raid/party units unless explicitly enabled.
+</Warning>

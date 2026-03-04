@@ -1,0 +1,469 @@
+---
+title: 'Tags Element'
+description: 'Dynamic text display system with powerful tag strings'
+---
+
+## Overview
+
+The Tags system provides a flexible way to display dynamic text on unit frames using tag strings. Tags are placeholders that get replaced with real-time unit information like name, health, power, level, and more.
+
+## Basic Usage
+
+```lua
+-- Create a font string
+local Text = self.Health:CreateFontString(nil, 'OVERLAY')
+Text:SetPoint('CENTER')
+Text:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+
+-- Register a tag string with oUF
+self:Tag(Text, '[name] [perhp]%')
+```
+
+This displays the unit's name followed by their health percentage, e.g., "Thrall 85%".
+
+## Tag Syntax
+
+### Basic Tag
+
+```
+[tagname]
+```
+
+Example: `[name]` displays the unit's name.
+
+### Tag with Prefix/Suffix
+
+```
+[prefix$>tagname<$suffix]
+```
+
+Example: `[Health: $>curhp<$ HP]` displays "Health: 15420 HP".
+
+<Note>
+  Prefix and suffix are only added if the tag returns a non-empty value.
+</Note>
+
+### Tag with Arguments
+
+```
+[tagname(arg1,arg2,arg3)]
+```
+
+Example: Custom tags can accept arguments to modify behavior.
+
+### Complete Syntax
+
+```
+[prefix$>tagname<$suffix(arg1,arg2)]
+```
+
+All parts except the tag name are optional.
+
+## Built-in Tags
+
+### Unit Information
+
+<ParamField path="[name]" type="tag">
+  Unit's name
+</ParamField>
+
+<ParamField path="[level]" type="tag">
+  Unit's level (shows "??" for high-level units)
+</ParamField>
+
+<ParamField path="[smartlevel]" type="tag">
+  Level with + for elite, or "Boss" for bosses
+</ParamField>
+
+<ParamField path="[class]" type="tag">
+  Unit's class (localized)
+</ParamField>
+
+<ParamField path="[creature]" type="tag">
+  Creature family or type
+</ParamField>
+
+<ParamField path="[smartclass]" type="tag">
+  Class for players, creature type for NPCs
+</ParamField>
+
+<ParamField path="[race]" type="tag">
+  Unit's race
+</ParamField>
+
+<ParamField path="[faction]" type="tag">
+  Unit's faction
+</ParamField>
+
+<ParamField path="[sex]" type="tag">
+  "Male" or "Female"
+</ParamField>
+
+### Health Tags
+
+<ParamField path="[curhp]" type="tag">
+  Current health
+</ParamField>
+
+<ParamField path="[maxhp]" type="tag">
+  Maximum health
+</ParamField>
+
+<ParamField path="[perhp]" type="tag">
+  Health percentage (0-100)
+</ParamField>
+
+<ParamField path="[missinghp]" type="tag">
+  Missing health (0 if full)
+</ParamField>
+
+<ParamField path="[dead]" type="tag">
+  "Dead" or "Ghost" if applicable
+</ParamField>
+
+<ParamField path="[offline]" type="tag">
+  "Offline" if disconnected
+</ParamField>
+
+<ParamField path="[status]" type="tag">
+  Combined status: Dead/Ghost/Offline/Resting
+</ParamField>
+
+### Power Tags
+
+<ParamField path="[curpp]" type="tag">
+  Current power
+</ParamField>
+
+<ParamField path="[maxpp]" type="tag">
+  Maximum power
+</ParamField>
+
+<ParamField path="[perpp]" type="tag">
+  Power percentage (0-100)
+</ParamField>
+
+<ParamField path="[missingpp]" type="tag">
+  Missing power (0 if full)
+</ParamField>
+
+<ParamField path="[curmana]" type="tag">
+  Current mana specifically
+</ParamField>
+
+<ParamField path="[maxmana]" type="tag">
+  Maximum mana specifically
+</ParamField>
+
+### Class Resource Tags
+
+<ParamField path="[cpoints]" type="tag">
+  Combo points (if > 0)
+</ParamField>
+
+<ParamField path="[chi]" type="tag">
+  Chi orbs for Windwalker Monk
+</ParamField>
+
+<ParamField path="[holypower]" type="tag">
+  Holy Power for Retribution Paladin
+</ParamField>
+
+<ParamField path="[soulshards]" type="tag">
+  Soul Shards for Warlock
+</ParamField>
+
+<ParamField path="[arcanecharges]" type="tag">
+  Arcane Charges for Arcane Mage
+</ParamField>
+
+<ParamField path="[runes]" type="tag">
+  Ready runes for Death Knight
+</ParamField>
+
+### Classification Tags
+
+<ParamField path="[classification]" type="tag">
+  "Rare", "Rare Elite", "Elite", "Boss", or "Affix"
+</ParamField>
+
+<ParamField path="[shortclassification]" type="tag">
+  "R", "R+", "+", "B", or "-"
+</ParamField>
+
+<ParamField path="[rare]" type="tag">
+  "Rare" for rare or rare elite units
+</ParamField>
+
+<ParamField path="[plus]" type="tag">
+  "+" for elite units
+</ParamField>
+
+<ParamField path="[affix]" type="tag">
+  "Affix" for minus mobs
+</ParamField>
+
+### Group Tags
+
+<ParamField path="[group]" type="tag">
+  Raid group number (1-8)
+</ParamField>
+
+<ParamField path="[leader]" type="tag">
+  "L" if group leader
+</ParamField>
+
+<ParamField path="[leaderlong]" type="tag">
+  "Leader" if group leader
+</ParamField>
+
+### Color Tags
+
+<ParamField path="[difficulty]" type="tag">
+  Color code based on level difficulty
+</ParamField>
+
+<ParamField path="[raidcolor]" type="tag">
+  Class color code
+</ParamField>
+
+<ParamField path="[powercolor]" type="tag">
+  Power type color code
+</ParamField>
+
+<ParamField path="[threatcolor]" type="tag">
+  Threat status color code
+</ParamField>
+
+### Misc Tags
+
+<ParamField path="[pvp]" type="tag">
+  "PvP" if flagged
+</ParamField>
+
+<ParamField path="[resting]" type="tag">
+  "zzz" if resting
+</ParamField>
+
+<ParamField path="[threat]" type="tag">
+  "++", "--", or "Aggro" based on threat
+</ParamField>
+
+<ParamField path="[arenaspec]" type="tag">
+  Arena opponent's specialization
+</ParamField>
+
+## Tag String Examples
+
+### Name and Health
+
+```lua
+self:Tag(HealthText, '[name] - [curhp]/[maxhp]')
+-- Output: "Thrall - 12450/18200"
+```
+
+### Name with Color
+
+```lua
+self:Tag(NameText, '[raidcolor][name]|r')
+-- Output: Name colored by class
+```
+
+### Health Percentage with Prefix
+
+```lua
+self:Tag(HealthText, '[perhp<$%]')
+-- Output: "85%" or empty if dead
+```
+
+### Conditional Display
+
+```lua
+self:Tag(StatusText, '[dead][offline][resting]')
+-- Shows only one: "Dead", "Offline", or "zzz"
+```
+
+### Complex Layout
+
+```lua
+self:Tag(InfoText, '[raidcolor][name]|r [difficulty][level][shortclassification]|r')
+-- Output: "Thrall 60+" (colored appropriately)
+```
+
+## Creating Custom Tags
+
+### Define a Tag Function
+
+```lua
+oUF.Tags.Methods['mylayout:healthcolor'] = function(unit)
+    local cur = UnitHealth(unit)
+    local max = UnitHealthMax(unit)
+    local perc = cur / max
+    
+    if perc > 0.5 then
+        return '|cff00ff00' -- Green
+    elseif perc > 0.25 then
+        return '|cffffff00' -- Yellow
+    else
+        return '|cffff0000' -- Red
+    end
+end
+```
+
+### Register Events
+
+```lua
+oUF.Tags.Events['mylayout:healthcolor'] = 'UNIT_HEALTH UNIT_MAXHEALTH'
+```
+
+### Use the Custom Tag
+
+```lua
+self:Tag(HealthText, '[mylayout:healthcolor][curhp]|r')
+-- Output: Colored health number
+```
+
+## Custom Tag with Arguments
+
+```lua
+-- Define tag that accepts a length argument
+oUF.Tags.Methods['mylayout:shortname'] = function(unit, realUnit, maxLength)
+    local name = UnitName(realUnit or unit)
+    local length = tonumber(maxLength) or 10
+    
+    if name and #name > length then
+        return name:sub(1, length) .. '...'
+    end
+    
+    return name
+end
+
+oUF.Tags.Events['mylayout:shortname'] = 'UNIT_NAME_UPDATE'
+
+-- Use with argument
+self:Tag(NameText, '[mylayout:shortname(8)]')
+-- Output: "Adventur..." for "Adventurer"
+```
+
+## Advanced Custom Tag
+
+```lua
+-- Threat-colored name
+oUF.Tags.Methods['mylayout:threatname'] = function(unit, realUnit)
+    local color = _TAGS['threatcolor'](unit)
+    local name = _TAGS['name'](unit, realUnit)
+    return string.format('%s%s|r', color, name)
+end
+
+oUF.Tags.Events['mylayout:threatname'] = 'UNIT_NAME_UPDATE UNIT_THREAT_SITUATION_UPDATE'
+
+self:Tag(NameText, '[mylayout:threatname]')
+```
+
+## Tag Options
+
+<ParamField path="overrideUnit" type="boolean">
+  Set on the FontString. If true, passes the unit's `realUnit` to tag functions.
+</ParamField>
+
+<ParamField path="frequentUpdates" type="boolean | number">
+  Set on the FontString. Updates the tag on a timer instead of events.
+  - `true` = update every 0.5 seconds
+  - `number` = update every N seconds
+</ParamField>
+
+## Managing Tags
+
+### Unregister a Tag
+
+```lua
+self:Untag(myFontString)
+```
+
+### Update All Tags
+
+```lua
+self:UpdateTags()
+```
+
+### Refresh Tag Method
+
+```lua
+-- After modifying a tag function
+oUF.Tags:RefreshMethods('mylayout:customtag')
+```
+
+### Refresh Tag Events
+
+```lua
+-- After modifying tag events
+oUF.Tags:RefreshEvents('mylayout:customtag')
+```
+
+## Tag Variables
+
+Share data between tags using the `_VARS` table:
+
+```lua
+oUF.Tags.Vars['myThreshold'] = 0.3
+
+oUF.Tags.Methods['mylayout:lowhp'] = function(unit)
+    local perc = UnitHealth(unit) / UnitHealthMax(unit)
+    if perc < _VARS.myThreshold then
+        return 'LOW HP!'
+    end
+end
+```
+
+## Helper Function (Hex)
+
+The Hex function is available in tag functions:
+
+```lua
+oUF.Tags.Methods['mylayout:customcolor'] = function(unit)
+    return Hex(1, 0.5, 0) -- Orange color
+end
+```
+
+## Complete Example
+
+```lua
+-- Health bar with multiple tag displays
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetHeight(20)
+Health:SetPoint('TOP', 0, 0)
+
+-- Left: Name with class color
+local Name = Health:CreateFontString(nil, 'OVERLAY')
+Name:SetPoint('LEFT', 2, 0)
+Name:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+Name:SetJustifyH('LEFT')
+self:Tag(Name, '[raidcolor][name]|r')
+
+-- Center: Status (dead/offline)
+local Status = Health:CreateFontString(nil, 'OVERLAY')
+Status:SetPoint('CENTER')
+Status:SetFont('Fonts\\FRIZQT__.TTF', 14, 'OUTLINE')
+self:Tag(Status, '[dead][offline]')
+
+-- Right: Health values
+local HealthValue = Health:CreateFontString(nil, 'OVERLAY')
+HealthValue:SetPoint('RIGHT', -2, 0)
+HealthValue:SetFont('Fonts\\FRIZQT__.TTF', 11, 'OUTLINE')
+HealthValue:SetJustifyH('RIGHT')
+self:Tag(HealthValue, '[curhp] / [maxhp]')
+
+self.Health = Health
+```
+
+<Tip>
+  Use the `|r` escape sequence to reset color codes after colored tags.
+</Tip>
+
+<Note>
+  Tag functions run in a restricted environment with access to `_TAGS` (other tag functions), `_COLORS` (oUF color table), `_FRAME` (the unit frame), and `_VARS` (shared variables).
+</Note>
+
+<Warning>
+  Avoid expensive operations in tag functions as they can be called frequently. Cache values when possible.
+</Warning>

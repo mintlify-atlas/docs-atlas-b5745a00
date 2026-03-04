@@ -1,0 +1,420 @@
+---
+title: Creating a Layout
+description: Complete guide to building your first oUF unit frame layout
+---
+
+This guide will walk you through creating a complete unit frame layout from scratch using oUF. You'll learn how to register a style, spawn frames, and add elements.
+
+## Overview
+
+A layout in oUF consists of:
+
+1. **Style function** - Defines the appearance and behavior of your frames
+2. **Registration** - Registers your style with oUF
+3. **Spawning** - Creates the actual frame objects
+4. **Elements** - Adds functionality like health bars, power bars, etc.
+
+## Basic Layout Structure
+
+Here's the fundamental structure of an oUF layout:
+
+```lua
+local addon, ns = ...
+local oUF = ns.oUF or oUF
+
+-- Style function defines how frames look
+local function StyleFrame(self, unit)
+  -- Your styling code goes here
+  self:SetSize(200, 50)
+end
+
+-- Register the style
+oUF:RegisterStyle('MyLayout', StyleFrame)
+
+-- Set as active and spawn frames
+oUF:Factory(function(oUF)
+  oUF:SetActiveStyle('MyLayout')
+  
+  -- Spawn individual frames
+  oUF:Spawn('player'):SetPoint('CENTER', -220, -250)
+  oUF:Spawn('target'):SetPoint('CENTER', 220, -250)
+end)
+```
+
+<Note>
+The `Factory` function ensures your frames are created after the player has logged in. This is important for proper initialization.
+</Note>
+
+## Step-by-Step: Creating Your First Layout
+
+<Steps>
+
+### Create the addon structure
+
+Create a folder in your WoW addons directory with these files:
+
+```
+MyLayout/
+├── MyLayout.toc
+├── core.lua
+└── layout.lua
+```
+
+**MyLayout.toc:**
+```
+## Interface: 110002
+## Title: My oUF Layout
+## Notes: My custom unit frames
+## RequiredDeps: oUF
+
+core.lua
+layout.lua
+```
+
+### Set up the core file
+
+**core.lua:**
+```lua
+local addon, ns = ...
+ns.oUF = oUF
+```
+
+### Create the style function
+
+**layout.lua:**
+```lua
+local addon, ns = ...
+local oUF = ns.oUF
+
+local function StyleFrame(self, unit)
+  -- Frame size and background
+  self:SetSize(200, 50)
+  self:SetBackdrop({
+    bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+    edgeFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+    edgeSize = 1,
+  })
+  self:SetBackdropColor(0, 0, 0, 0.5)
+  self:SetBackdropBorderColor(0, 0, 0)
+  
+  -- Health bar
+  local Health = CreateFrame('StatusBar', nil, self)
+  Health:SetHeight(30)
+  Health:SetPoint('TOP')
+  Health:SetPoint('LEFT')
+  Health:SetPoint('RIGHT')
+  Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Health.colorClass = true
+  Health.colorReaction = true
+  Health.colorHealth = true
+  
+  self.Health = Health
+  
+  -- Power bar
+  local Power = CreateFrame('StatusBar', nil, self)
+  Power:SetHeight(15)
+  Power:SetPoint('BOTTOM')
+  Power:SetPoint('LEFT')
+  Power:SetPoint('RIGHT')
+  Power:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Power.colorPower = true
+  
+  self.Power = Power
+  
+  -- Name text
+  local Name = Health:CreateFontString(nil, 'OVERLAY')
+  Name:SetPoint('LEFT', Health, 2, 0)
+  Name:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+  Name:SetJustifyH('LEFT')
+  self:Tag(Name, '[name]')
+  
+  -- Health value text
+  local HealthValue = Health:CreateFontString(nil, 'OVERLAY')
+  HealthValue:SetPoint('RIGHT', Health, -2, 0)
+  HealthValue:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+  HealthValue:SetJustifyH('RIGHT')
+  self:Tag(HealthValue, '[curhp] / [maxhp]')
+end
+
+-- Register the style
+oUF:RegisterStyle('MyLayout', StyleFrame)
+```
+
+### Spawn the frames
+
+Add this to the bottom of **layout.lua:**
+
+```lua
+oUF:Factory(function(oUF)
+  oUF:SetActiveStyle('MyLayout')
+  
+  -- Player frame
+  local player = oUF:Spawn('player', 'oUF_MyLayoutPlayer')
+  player:SetPoint('CENTER', UIParent, 'CENTER', -220, -250)
+  
+  -- Target frame
+  local target = oUF:Spawn('target', 'oUF_MyLayoutTarget')
+  target:SetPoint('CENTER', UIParent, 'CENTER', 220, -250)
+  
+  -- Target of Target
+  local tot = oUF:Spawn('targettarget', 'oUF_MyLayoutToT')
+  tot:SetPoint('BOTTOMLEFT', target, 'TOPRIGHT', 0, 5)
+  
+  -- Pet frame
+  local pet = oUF:Spawn('pet', 'oUF_MyLayoutPet')
+  pet:SetPoint('BOTTOMRIGHT', player, 'TOPLEFT', 0, 5)
+  
+  -- Focus frame
+  local focus = oUF:Spawn('focus', 'oUF_MyLayoutFocus')
+  focus:SetPoint('BOTTOMLEFT', player, 'TOPLEFT', 0, 100)
+end)
+```
+
+### Test your layout
+
+Reload your UI (`/reload`) and you should see your custom unit frames!
+
+</Steps>
+
+## Spawning Group Frames
+
+For party and raid frames, use `SpawnHeader` instead of `Spawn`:
+
+```lua
+-- Party frames
+local party = oUF:SpawnHeader(
+  'oUF_MyLayoutParty',
+  nil,
+  'party',
+  'showParty', true,
+  'yOffset', -5,
+  'oUF-initialConfigFunction', [[self:SetHeight(40); self:SetWidth(180)]]
+)
+party:SetPoint('LEFT', UIParent, 'LEFT', 10, 0)
+
+-- Raid frames
+local raid = oUF:SpawnHeader(
+  'oUF_MyLayoutRaid',
+  nil,
+  'raid',
+  'showRaid', true,
+  'groupFilter', '1,2,3,4,5,6,7,8',
+  'groupBy', 'GROUP',
+  'groupingOrder', '1,2,3,4,5,6,7,8',
+  'maxColumns', 8,
+  'unitsPerColumn', 5,
+  'columnSpacing', 5,
+  'columnAnchorPoint', 'TOP',
+  'oUF-initialConfigFunction', [[self:SetHeight(30); self:SetWidth(60)]]
+)
+raid:SetPoint('TOPLEFT', UIParent, 'TOPLEFT', 10, -10)
+```
+
+<Warning>
+Group header attributes must be set before the header is shown. Changes to attributes like `groupFilter` after spawning may not take effect.
+</Warning>
+
+## Advanced: Unit-Specific Styling
+
+You can customize styling based on the unit:
+
+```lua
+local function StyleFrame(self, unit)
+  self:SetSize(200, 50)
+  
+  -- Common elements for all units
+  local Health = CreateFrame('StatusBar', nil, self)
+  Health:SetPoint('TOPLEFT')
+  Health:SetPoint('TOPRIGHT')
+  Health:SetHeight(30)
+  Health.colorClass = true
+  self.Health = Health
+  
+  -- Unit-specific customization
+  if unit == 'player' then
+    -- Player gets a castbar
+    local Castbar = CreateFrame('StatusBar', nil, self)
+    Castbar:SetSize(200, 20)
+    Castbar:SetPoint('TOP', self, 'BOTTOM', 0, -5)
+    Castbar:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+    
+    local Text = Castbar:CreateFontString(nil, 'OVERLAY')
+    Text:SetPoint('LEFT', Castbar)
+    Text:SetFont('Fonts\\FRIZQT__.TTF', 11)
+    Castbar.Text = Text
+    
+    self.Castbar = Castbar
+    
+  elseif unit == 'target' then
+    -- Target gets buffs and debuffs
+    local Buffs = CreateFrame('Frame', nil, self)
+    Buffs:SetSize(200, 20)
+    Buffs:SetPoint('BOTTOMLEFT', self, 'TOPLEFT', 0, 5)
+    Buffs.size = 20
+    Buffs.num = 10
+    self.Buffs = Buffs
+    
+  elseif unit:match('party%d') or unit:match('raid%d') then
+    -- Party/raid frames are smaller
+    self:SetSize(80, 40)
+    Health:SetHeight(40)
+  end
+end
+```
+
+## Using Style Tables
+
+Instead of a function, you can use a table of functions:
+
+```lua
+local style = {}
+
+style.Health = function(Health, unit)
+  Health:SetHeight(30)
+  Health:SetPoint('TOP')
+  Health:SetPoint('LEFT')
+  Health:SetPoint('RIGHT')
+  Health.colorClass = true
+end
+
+style.Power = function(Power, unit)
+  Power:SetHeight(15)
+  Power:SetPoint('BOTTOM')
+  Power:SetPoint('LEFT')
+  Power:SetPoint('RIGHT')
+  Power.colorPower = true
+end
+
+local function StyleFrame(self, unit)
+  self:SetSize(200, 50)
+  
+  local Health = CreateFrame('StatusBar', nil, self)
+  style.Health(Health, unit)
+  self.Health = Health
+  
+  local Power = CreateFrame('StatusBar', nil, self)
+  style.Power(Power, unit)
+  self.Power = Power
+end
+
+oUF:RegisterStyle('MyLayout', StyleFrame)
+```
+
+## Disabling Blizzard Frames
+
+oUF automatically disables Blizzard frames for units you spawn, but you can disable additional frames:
+
+```lua
+oUF:Factory(function(oUF)
+  oUF:SetActiveStyle('MyLayout')
+  
+  -- Disable additional Blizzard frames
+  oUF:DisableBlizzard('party')
+  oUF:DisableBlizzard('raid')
+  oUF:DisableBlizzard('boss')
+  oUF:DisableBlizzard('arena')
+  
+  -- Spawn your frames
+  oUF:Spawn('player'):SetPoint('CENTER', -220, -250)
+end)
+```
+
+## Common Pitfalls
+
+<Warning>
+**Don't spawn frames outside of `Factory`** - Frames spawned too early may not initialize properly.
+</Warning>
+
+<Warning>
+**Always set a style before spawning** - Use `SetActiveStyle()` before calling `Spawn()` or `SpawnHeader()`.
+</Warning>
+
+<Note>
+**Frame names should be unique** - The second parameter to `Spawn()` is optional but recommended for debugging and SavedVariables.
+</Note>
+
+<Tip>
+Use `oUF.objects` to access all spawned frames programmatically:
+```lua
+for _, frame in ipairs(oUF.objects) do
+  print(frame.unit, frame:GetName())
+end
+```
+</Tip>
+
+## Next Steps
+
+Now that you have a basic layout:
+
+- [Style your frames](/guides/styling-frames) with colors, textures, and positioning
+- [Add custom elements](/guides/custom-elements) for unique functionality  
+- [Create nameplate frames](/guides/nameplates) for enemy nameplates
+- Browse the [Element Reference](/elements/health) for available features
+
+## Complete Example
+
+Here's a complete, working layout:
+
+```lua layout.lua
+local addon, ns = ...
+local oUF = ns.oUF
+
+local function StyleFrame(self, unit)
+  self:SetSize(200, 50)
+  
+  -- Background
+  self:SetBackdrop({
+    bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+    edgeFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+    edgeSize = 1,
+  })
+  self:SetBackdropColor(0, 0, 0, 0.5)
+  self:SetBackdropBorderColor(0, 0, 0)
+  
+  -- Health
+  local Health = CreateFrame('StatusBar', nil, self)
+  Health:SetHeight(30)
+  Health:SetPoint('TOP')
+  Health:SetPoint('LEFT')
+  Health:SetPoint('RIGHT')
+  Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Health.colorClass = true
+  Health.colorReaction = true
+  Health.colorHealth = true
+  self.Health = Health
+  
+  -- Power
+  local Power = CreateFrame('StatusBar', nil, self)
+  Power:SetHeight(15)
+  Power:SetPoint('BOTTOM')
+  Power:SetPoint('LEFT')
+  Power:SetPoint('RIGHT')
+  Power:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Power.colorPower = true
+  self.Power = Power
+  
+  -- Name
+  local Name = Health:CreateFontString(nil, 'OVERLAY')
+  Name:SetPoint('LEFT', Health, 2, 0)
+  Name:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+  self:Tag(Name, '[name]')
+  
+  -- Health value
+  local HealthValue = Health:CreateFontString(nil, 'OVERLAY')
+  HealthValue:SetPoint('RIGHT', Health, -2, 0)
+  HealthValue:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+  self:Tag(HealthValue, '[curhp]')
+end
+
+oUF:RegisterStyle('MyLayout', StyleFrame)
+
+oUF:Factory(function(oUF)
+  oUF:SetActiveStyle('MyLayout')
+  
+  oUF:Spawn('player'):SetPoint('CENTER', -220, -250)
+  oUF:Spawn('target'):SetPoint('CENTER', 220, -250)
+  oUF:Spawn('targettarget'):SetPoint('BOTTOMLEFT', oUF_MyLayoutTarget, 'TOPRIGHT', 0, 5)
+  oUF:Spawn('pet'):SetPoint('BOTTOMRIGHT', oUF_MyLayoutPlayer, 'TOPLEFT', 0, 5)
+  oUF:Spawn('focus'):SetPoint('TOPLEFT', UIParent, 'TOPLEFT', 10, -100)
+end)
+```

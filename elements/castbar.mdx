@@ -1,0 +1,375 @@
+---
+title: 'Castbar Element'
+description: 'Display spell casting and channeling progress'
+---
+
+## Overview
+
+The Castbar element displays spell cast and channel progress for units. It supports regular casts, channeled spells, empowered casts (like Evoker abilities), interruption detection, latency visualization, and customizable text/time displays.
+
+## Basic Usage
+
+```lua
+local Castbar = CreateFrame('StatusBar', nil, self)
+Castbar:SetSize(200, 20)
+Castbar:SetPoint('BOTTOM', self, 'TOP', 0, 5)
+
+-- Add spell name text
+local Text = Castbar:CreateFontString(nil, 'OVERLAY')
+Text:SetPoint('LEFT', 2, 0)
+Text:SetFont('Fonts\\FRIZQT__.TTF', 12)
+Castbar.Text = Text
+
+-- Add cast time text
+local Time = Castbar:CreateFontString(nil, 'OVERLAY')
+Time:SetPoint('RIGHT', -2, 0)
+Time:SetFont('Fonts\\FRIZQT__.TTF', 12)
+Castbar.Time = Time
+
+-- Register with oUF
+self.Castbar = Castbar
+```
+
+## Widget
+
+<ParamField path="Castbar" type="StatusBar" required>
+  A StatusBar widget representing spell cast/channel progress. A default texture will be applied if one is not set.
+</ParamField>
+
+## Sub-Widgets
+
+<ParamField path="Castbar.Icon" type="Texture">
+  Displays the spell icon.
+</ParamField>
+
+<ParamField path="Castbar.SafeZone" type="Texture">
+  Displays latency as a colored zone on the castbar (player only).
+</ParamField>
+
+<ParamField path="Castbar.Shield" type="Texture">
+  Indicates whether the cast is interruptible.
+</ParamField>
+
+<ParamField path="Castbar.Spark" type="Texture">
+  Represents the castbar's progress edge.
+</ParamField>
+
+<ParamField path="Castbar.Text" type="FontString">
+  Displays the spell name.
+</ParamField>
+
+<ParamField path="Castbar.Time" type="FontString">
+  Displays remaining cast time or duration.
+</ParamField>
+
+## Options
+
+<ParamField path="Castbar.timeToHold" type="number">
+  Seconds to keep the castbar visible after a failed or interrupted cast. Defaults to 0.
+</ParamField>
+
+<ParamField path="Castbar.hideTradeSkills" type="boolean">
+  Ignore casts related to crafting professions.
+</ParamField>
+
+<ParamField path="Castbar.smoothing" type="number">
+  Status bar smoothing method. Defaults to `Enum.StatusBarInterpolation.Immediate`.
+</ParamField>
+
+## Attributes
+
+The Castbar element provides several read-only attributes during callbacks:
+
+<ParamField path="Castbar.castID" type="number">
+  Unique identifier for the current cast.
+</ParamField>
+
+<ParamField path="Castbar.casting" type="boolean">
+  True if currently casting a regular spell.
+</ParamField>
+
+<ParamField path="Castbar.channeling" type="boolean">
+  True if currently channeling a spell.
+</ParamField>
+
+<ParamField path="Castbar.empowering" type="boolean">
+  True if currently casting an empowered spell (Evoker).
+</ParamField>
+
+<ParamField path="Castbar.notInterruptible" type="boolean">
+  True if the current cast cannot be interrupted.
+</ParamField>
+
+<ParamField path="Castbar.spellID" type="number">
+  Spell ID of the cast.
+</ParamField>
+
+<ParamField path="Castbar.spellName" type="string">
+  Name of the spell being cast.
+</ParamField>
+
+## Callbacks
+
+<ParamField path="Castbar:PostCastStart" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called after a cast or channel starts.
+</ParamField>
+
+<ParamField path="Castbar:PostCastUpdate" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called when a cast or channel is updated (delayed).
+</ParamField>
+
+<ParamField path="Castbar:PostCastStop" type="function">
+  ```lua
+  function(self, unit, empowerComplete)
+  ```
+  Called after a cast or channel completes successfully.
+  - `empowerComplete` - (boolean) True if empowered cast was complete
+</ParamField>
+
+<ParamField path="Castbar:PostCastFail" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called after a cast fails (not interrupted by another player).
+</ParamField>
+
+<ParamField path="Castbar:PostCastInterrupted" type="function">
+  ```lua
+  function(self, unit, interruptedBy)
+  ```
+  Called after a cast is interrupted.
+  - `interruptedBy` - (string) GUID of the interrupter
+</ParamField>
+
+<ParamField path="Castbar:PostCastInterruptible" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called when cast interruptibility changes.
+</ParamField>
+
+<ParamField path="Castbar:PostUpdatePips" type="function">
+  ```lua
+  function(self, stages)
+  ```
+  Called after empowered cast stage separators (pips) are updated.
+  - `stages` - (table) Stage percentages
+</ParamField>
+
+## Overrides
+
+<ParamField path="Castbar.ShouldShow" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Determines if the castbar should show for the given unit. Defaults to checking if unit matches the frame's unit.
+</ParamField>
+
+<ParamField path="Castbar.CustomDelayText" type="function">
+  ```lua
+  function(self, duration)
+  ```
+  Custom formatting for the Time widget when there's a cast delay.
+  - `duration` - [DurationObject](https://warcraft.wiki.gg/wiki/ScriptObject_DurationObject)
+</ParamField>
+
+<ParamField path="Castbar.CustomTimeText" type="function">
+  ```lua
+  function(self, duration)
+  ```
+  Custom formatting for the Time widget.
+  - `duration` - [DurationObject](https://warcraft.wiki.gg/wiki/ScriptObject_DurationObject)
+</ParamField>
+
+<ParamField path="Castbar.UpdatePips" type="function">
+  ```lua
+  function(self, stages)
+  ```
+  Override pip positioning for empowered casts.
+</ParamField>
+
+<ParamField path="Castbar.CreatePip" type="function">
+  ```lua
+  function(self, stage)
+  ```
+  Override pip creation for empowered casts. Must return a frame.
+</ParamField>
+
+<ParamField path="Castbar.OnUpdate" type="function">
+  ```lua
+  function(self, elapsed)
+  ```
+  Override the OnUpdate script.
+</ParamField>
+
+## Complete Example
+
+```lua
+-- Create castbar
+local Castbar = CreateFrame('StatusBar', nil, self)
+Castbar:SetSize(self:GetWidth(), 20)
+Castbar:SetPoint('BOTTOM', self, 'TOP', 0, 5)
+Castbar:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+Castbar:SetStatusBarColor(1, 0.7, 0)
+
+-- Background
+local bg = Castbar:CreateTexture(nil, 'BACKGROUND')
+bg:SetAllPoints()
+bg:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+bg:SetVertexColor(0.3, 0.21, 0)
+
+-- Spell icon
+local Icon = Castbar:CreateTexture(nil, 'OVERLAY')
+Icon:SetSize(20, 20)
+Icon:SetPoint('RIGHT', Castbar, 'LEFT', -5, 0)
+Icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+Castbar.Icon = Icon
+
+-- Icon border
+local IconBorder = Castbar:CreateTexture(nil, 'BACKGROUND')
+IconBorder:SetPoint('TOPLEFT', Icon, -1, 1)
+IconBorder:SetPoint('BOTTOMRIGHT', Icon, 1, -1)
+IconBorder:SetTexture('Interface\\Buttons\\WHITE8x8')
+IconBorder:SetVertexColor(0, 0, 0)
+
+-- Shield (non-interruptible indicator)
+local Shield = Castbar:CreateTexture(nil, 'OVERLAY')
+Shield:SetSize(20, 20)
+Shield:SetPoint('CENTER', Icon)
+Castbar.Shield = Shield
+
+-- Spell name
+local Text = Castbar:CreateFontString(nil, 'OVERLAY')
+Text:SetPoint('LEFT', Castbar, 2, 0)
+Text:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+Text:SetJustifyH('LEFT')
+Castbar.Text = Text
+
+-- Cast time
+local Time = Castbar:CreateFontString(nil, 'OVERLAY')
+Time:SetPoint('RIGHT', Castbar, -2, 0)
+Time:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+Time:SetJustifyH('RIGHT')
+Castbar.Time = Time
+
+-- Spark
+local Spark = Castbar:CreateTexture(nil, 'OVERLAY')
+Spark:SetSize(20, 20)
+Spark:SetBlendMode('ADD')
+Spark:SetPoint('CENTER', Castbar:GetStatusBarTexture(), 'RIGHT', 0, 0)
+Castbar.Spark = Spark
+
+-- SafeZone (latency indicator for player)
+local SafeZone = Castbar:CreateTexture(nil, 'OVERLAY')
+SafeZone:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+SafeZone:SetVertexColor(1, 0, 0, 0.5)
+Castbar.SafeZone = SafeZone
+
+-- Options
+Castbar.timeToHold = 0.5 -- Show for 0.5s after interrupt/fail
+Castbar.hideTradeSkills = true
+
+-- Color based on cast type
+Castbar.PostCastStart = function(self, unit)
+    if self.notInterruptible then
+        self:SetStatusBarColor(0.8, 0.8, 0.8) -- Gray for non-interruptible
+    elseif self.channeling then
+        self:SetStatusBarColor(0.3, 0.6, 1) -- Blue for channeling
+    else
+        self:SetStatusBarColor(1, 0.7, 0) -- Orange for casting
+    end
+end
+
+-- Color red on interrupt/fail
+Castbar.PostCastFail = function(self, unit)
+    self:SetStatusBarColor(1, 0, 0)
+end
+
+Castbar.PostCastInterrupted = function(self, unit, interruptedBy)
+    self:SetStatusBarColor(1, 0, 0)
+end
+
+self.Castbar = Castbar
+```
+
+## Empowered Casts (Evoker)
+
+For Evoker's empowered spells, the castbar automatically creates "pips" (stage separators):
+
+```lua
+local Castbar = CreateFrame('StatusBar', nil, self)
+Castbar:SetSize(200, 24)
+Castbar:SetPoint('BOTTOM', self, 'TOP', 0, 5)
+
+-- Pips will be created automatically
+Castbar.Pips = {}
+
+-- Customize pip appearance
+Castbar.PostUpdatePips = function(self, stages)
+    for i, pip in pairs(self.Pips) do
+        -- Customize pip visual here
+        pip:SetColorTexture(1, 1, 1, 0.8)
+    end
+end
+
+self.Castbar = Castbar
+```
+
+## Custom Time Format
+
+```lua
+Castbar.CustomTimeText = function(self, duration)
+    local remaining = duration:GetRemainingDuration()
+    
+    -- Show minutes and seconds for long casts
+    if remaining >= 60 then
+        self.Time:SetFormattedText('%d:%02d', math.floor(remaining / 60), remaining % 60)
+    else
+        self.Time:SetFormattedText('%.1f', remaining)
+    end
+end
+
+-- Custom delay text (shows latency adjustment)
+Castbar.CustomDelayText = function(self, duration)
+    local remaining = duration:GetRemainingDuration()
+    local sign = self.channeling and '-' or '+'
+    self.Time:SetFormattedText('%.1f |cffff0000%s%.2f|r', remaining, sign, self.delay)
+end
+```
+
+## Multi-Target Castbar
+
+Show casts from multiple units (e.g., arena opponents):
+
+```lua
+Castbar.ShouldShow = function(self, unit)
+    -- Show for our unit and all arena units
+    if self.__owner.unit == unit then
+        return true
+    end
+    
+    if unit:match('^arena%d') then
+        return true
+    end
+    
+    return false
+end
+```
+
+<Note>
+  The Castbar element automatically disables Blizzard's player and pet casting bars when enabled on the player frame.
+</Note>
+
+<Tip>
+  Use the SafeZone sub-widget to show latency on the player castbar, helping players time their next spell before the current cast finishes.
+</Tip>
+
+<Warning>
+  The Castbar element will not work for units ending with "target" (e.g., "targettarget") as Blizzard doesn't provide casting information for those units.
+</Warning>

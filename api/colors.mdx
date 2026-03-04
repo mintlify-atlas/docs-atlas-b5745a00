@@ -1,0 +1,478 @@
+---
+title: 'Colors API'
+description: 'Color system with support for curves, atlases, and predefined color tables'
+---
+
+## Overview
+
+oUF extends Blizzard's [ColorMixin](https://warcraft.wiki.gg/wiki/ColorMixin) with additional functionality for atlases and color curves. All color objects support standard ColorMixin methods plus oUF-specific extensions.
+
+---
+
+## Creating Colors
+
+### CreateColor
+
+Creates a new color object with extended functionality.
+
+```lua
+local color = oUF:CreateColor(r, g, b, a)
+```
+
+<ParamField path="r" type="number" required>
+  Red component. Accepts normalized (0-1) or byte (0-255) values.
+</ParamField>
+
+<ParamField path="g" type="number" required>
+  Green component. Accepts normalized (0-1) or byte (0-255) values.
+</ParamField>
+
+<ParamField path="b" type="number" required>
+  Blue component. Accepts normalized (0-1) or byte (0-255) values.
+</ParamField>
+
+<ParamField path="a" type="number">
+  Alpha component (opacity). Normalized (0-1).
+</ParamField>
+
+<ResponseField name="color" type="Color">
+  A color object with all ColorMixin methods plus oUF extensions
+</ResponseField>
+
+<Note>
+  Colors are automatically normalized if any RGB value is greater than 1. You can pass byte values (0-255) or normalized values (0-1).
+</Note>
+
+**Example:**
+
+```lua
+-- Using byte values
+local red = oUF:CreateColor(255, 0, 0)
+
+-- Using normalized values
+local blue = oUF:CreateColor(0, 0, 1)
+
+-- With alpha
+local translucentGreen = oUF:CreateColor(0, 255, 0, 0.5)
+```
+
+---
+
+## ColorMixin Methods
+
+All color objects have access to standard ColorMixin methods:
+
+### GetRGB / GetRGBA
+
+```lua
+local r, g, b = color:GetRGB()
+local r, g, b, a = color:GetRGBA()
+```
+
+### SetRGB / SetRGBA
+
+```lua
+color:SetRGB(r, g, b)
+color:SetRGBA(r, g, b, a)
+```
+
+### GetRGBAsBytes
+
+```lua
+local r, g, b = color:GetRGBAsBytes()  -- Returns 0-255
+```
+
+### IsEqualTo
+
+```lua
+if color:IsEqualTo(otherColor) then
+  print('Colors match')
+end
+```
+
+See [ColorMixin documentation](https://warcraft.wiki.gg/wiki/ColorMixin) for the complete list.
+
+---
+
+## oUF Color Extensions
+
+### Atlas Support
+
+Colors can be associated with texture atlases, useful for power bars and other UI elements.
+
+#### SetAtlas
+
+Associates an atlas with the color.
+
+```lua
+color:SetAtlas(atlas)
+```
+
+<ParamField path="atlas" type="string" required>
+  Name of a valid texture atlas
+</ParamField>
+
+**Example:**
+
+```lua
+local manaColor = oUF:CreateColor(0, 0, 1)
+manaColor:SetAtlas('UI-HUD-UnitFrame-Player-PortraitOn-Bar-Mana')
+```
+
+---
+
+#### GetAtlas
+
+Returns the associated atlas name.
+
+```lua
+local atlas = color:GetAtlas()
+```
+
+<ResponseField name="atlas" type="string | nil">
+  The atlas name if one was set, otherwise `nil`
+</ResponseField>
+
+---
+
+### Color Curves
+
+Color curves allow smooth color transitions based on a normalized value (0-1), useful for health bars, threat indicators, etc.
+
+#### SetCurve
+
+Defines a color curve for smooth transitions.
+
+```lua
+color:SetCurve(points)
+```
+
+<ParamField path="points" type="table | ...">
+  Curve points as a table `{ [x] = color }` or as key-value pairs `x1, color1, x2, color2, ...`
+  
+  Pass `nil` to remove the curve.
+</ParamField>
+
+**Example:**
+
+```lua
+local healthColor = oUF:CreateColor(0, 1, 0)
+
+-- Using a table
+healthColor:SetCurve({
+  [0]   = CreateColor(1, 0, 0),  -- Red at 0%
+  [0.5] = CreateColor(1, 1, 0),  -- Yellow at 50%
+  [1]   = CreateColor(0, 1, 0),  -- Green at 100%
+})
+
+-- Using parameters
+healthColor:SetCurve(
+  0,   CreateColor(1, 0, 0),
+  0.5, CreateColor(1, 1, 0),
+  1,   CreateColor(0, 1, 0)
+)
+
+-- Remove curve
+healthColor:SetCurve(nil)
+```
+
+<Note>
+  All colors created with `oUF:CreateColor()` include a default smooth health curve (red → yellow → green).
+</Note>
+
+---
+
+#### GetCurve
+
+Returns the color curve object.
+
+```lua
+local curve = color:GetCurve()
+```
+
+<ResponseField name="curve" type="ColorCurve | nil">
+  The curve object created with `C_CurveUtil.CreateColorCurve()`, or `nil` if no curve is set
+</ResponseField>
+
+**Using curves:**
+
+```lua
+local health = UnitHealth(unit)
+local maxHealth = UnitHealthMax(unit)
+local percent = health / maxHealth
+
+if color:GetCurve() then
+  local r, g, b = color:GetCurve():GetValue(percent):GetRGB()
+  healthBar:SetStatusBarColor(r, g, b)
+else
+  local r, g, b = color:GetRGB()
+  healthBar:SetStatusBarColor(r, g, b)
+end
+```
+
+---
+
+## Color Tables
+
+oUF provides predefined color tables accessible via `oUF.colors` or `frame.colors`.
+
+### Class Colors
+
+```lua
+oUF.colors.class
+```
+
+Colors for all player classes, indexed by class token.
+
+**Example:**
+
+```lua
+local _, class = UnitClass(unit)
+local color = oUF.colors.class[class]
+if color then
+  local r, g, b = color:GetRGB()
+  frame.Name:SetTextColor(r, g, b)
+end
+```
+
+**Available classes:**
+- `WARRIOR`, `PALADIN`, `HUNTER`, `ROGUE`, `PRIEST`, `DEATHKNIGHT`, `SHAMAN`, `MAGE`, `WARLOCK`, `MONK`, `DRUID`, `DEMONHUNTER`, `EVOKER`
+
+<Note>
+  oUF automatically supports `CUSTOM_CLASS_COLORS` if the addon is loaded, updating all frames when colors change.
+</Note>
+
+---
+
+### Power Colors
+
+```lua
+oUF.colors.power
+```
+
+Colors for all power types, indexed by power type name or enum value.
+
+**Example:**
+
+```lua
+local powerType = UnitPowerType(unit)
+local color = oUF.colors.power[powerType] or oUF.colors.power.MANA
+
+local r, g, b = color:GetRGB()
+frame.Power:SetStatusBarColor(r, g, b)
+
+-- Check for atlas
+if color:GetAtlas() then
+  frame.Power:SetStatusBarAtlas(color:GetAtlas())
+end
+```
+
+**Available power types:**
+- By name: `MANA`, `RAGE`, `FOCUS`, `ENERGY`, `COMBO_POINTS`, `RUNES`, `RUNIC_POWER`, `SOUL_SHARDS`, `LUNAR_POWER`, `HOLY_POWER`, `MAELSTROM`, `CHI`, `INSANITY`, `ARCANE_CHARGES`, `FURY`, `PAIN`, `ESSENCE`, `ALTERNATE`
+- By enum: `Enum.PowerType.Mana`, `Enum.PowerType.Rage`, etc.
+
+**Special power colors:**
+
+Some power types have multiple colors for different stages:
+
+```lua
+-- Stagger colors (Monk)
+oUF.colors.power.STAGGER[1]  -- Green
+oUF.colors.power.STAGGER[2]  -- Yellow
+oUF.colors.power.STAGGER[3]  -- Red
+```
+
+---
+
+### Reaction Colors
+
+```lua
+oUF.colors.reaction
+```
+
+Colors for NPC reaction levels (based on `FACTION_BAR_COLORS`).
+
+**Example:**
+
+```lua
+local reaction = UnitReaction(unit, 'player')
+if reaction then
+  local color = oUF.colors.reaction[reaction]
+  if color then
+    local r, g, b = color:GetRGB()
+    frame.Health:SetStatusBarColor(r, g, b)
+  end
+end
+```
+
+**Reaction levels:**
+- `1` - Hated
+- `2` - Hostile  
+- `3` - Unfriendly
+- `4` - Neutral
+- `5` - Friendly
+- `6` - Honored
+- `7` - Revered
+- `8` - Exalted
+
+---
+
+### Selection Colors
+
+```lua
+oUF.colors.selection
+```
+
+Colors based on unit selection type (uses `UnitSelectionColor`).
+
+**Example:**
+
+```lua
+local selectionType = UnitSelectionType(unit)
+local color = oUF.colors.selection[selectionType]
+if color then
+  local r, g, b = color:GetRGB()
+  frame.Health:SetStatusBarColor(r, g, b)
+end
+```
+
+**Available via `oUF.Enum.SelectionType`:**
+- `Hostile`, `Unfriendly`, `Neutral`, `Friendly`, `PlayerSimple`, `PlayerExtended`, `Party`, `PartyPvP`, `Friend`, `Dead`, `PartyPvPInBattleground`, `RecentAlly`
+
+---
+
+### Dispel Colors
+
+```lua
+oUF.colors.dispel
+```
+
+Colors for debuff types that can be dispelled.
+
+**Example:**
+
+```lua
+local debuffType = select(5, UnitAura(unit, i, 'HARMFUL'))
+local color = oUF.colors.dispel[debuffType] or oUF.colors.dispel[oUF.Enum.DispelType.None]
+
+local r, g, b = color:GetRGB()
+border:SetBackdropBorderColor(r, g, b)
+```
+
+**Available via `oUF.Enum.DispelType`:**
+- `None`, `Magic`, `Curse`, `Disease`, `Poison`, `Bleed`, `Enrage`
+
+---
+
+### Threat Colors
+
+```lua
+oUF.colors.threat
+```
+
+Colors for threat levels (0-3).
+
+**Example:**
+
+```lua
+local status = UnitThreatSituation(unit)
+if status then
+  local color = oUF.colors.threat[status]
+  local r, g, b = color:GetRGB()
+  frame.Threat:SetBackdropBorderColor(r, g, b)
+end
+```
+
+**Threat levels:**
+- `0` - No threat
+- `1` - Not tanking, higher threat than tank
+- `2` - Insecurely tanking
+- `3` - Securely tanking
+
+---
+
+### Rune Colors
+
+```lua
+oUF.colors.runes
+```
+
+Colors for Death Knight runes.
+
+**Example:**
+
+```lua
+for i = 1, 6 do
+  local runeType = GetRuneType(i)
+  local color = oUF.colors.runes[runeType] or oUF.colors.runes[1]
+  local r, g, b = color:GetRGB()
+  frame.Runes[i]:SetStatusBarColor(r, g, b)
+end
+```
+
+**Rune types:**
+- `1` - Blood (red)
+- `2` - Frost (blue)
+- `3` - Unholy (green)
+
+---
+
+### Other Colors
+
+```lua
+-- Default health color
+oUF.colors.health  -- Bright green (49, 207, 37)
+
+-- Disconnected units
+oUF.colors.disconnected  -- Gray (0.6, 0.6, 0.6)
+
+-- Tapped units (killed by another player)
+oUF.colors.tapped  -- Gray (0.6, 0.6, 0.6)
+```
+
+---
+
+## Usage Examples
+
+### Smooth Health Coloring
+
+```lua
+local function UpdateHealth(frame, event, unit)
+  if frame.unit ~= unit then return end
+  
+  local health = UnitHealth(unit)
+  local maxHealth = UnitHealthMax(unit)
+  
+  frame.Health:SetMinMaxValues(0, maxHealth)
+  frame.Health:SetValue(health)
+  
+  local color = oUF.colors.health
+  if color:GetCurve() then
+    local percent = health / maxHealth
+    local r, g, b = color:GetCurve():GetValue(percent):GetRGB()
+    frame.Health:SetStatusBarColor(r, g, b)
+  end
+end
+```
+
+---
+
+### Custom Curve for Threat
+
+```lua
+local threatColor = oUF:CreateColor(0, 1, 0)
+threatColor:SetCurve({
+  [0]   = CreateColor(0, 1, 0),    -- Green - safe
+  [0.5] = CreateColor(1, 1, 0),    -- Yellow - warning
+  [1]   = CreateColor(1, 0, 0),    -- Red - danger
+})
+
+-- Use in an element
+local function UpdateThreat(frame)
+  local status, _, threatpct = UnitDetailedThreatSituation('player', 'target')
+  if threatpct then
+    local r, g, b = threatColor:GetCurve():GetValue(threatpct / 100):GetRGB()
+    frame.Threat:SetBackdropBorderColor(r, g, b)
+  end
+end
+```

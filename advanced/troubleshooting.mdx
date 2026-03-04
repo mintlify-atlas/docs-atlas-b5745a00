@@ -1,0 +1,568 @@
+---
+title: Troubleshooting Guide
+description: Common issues, debugging techniques, and solutions for oUF layouts
+---
+
+## Common Issues
+
+### Elements Not Showing
+
+#### Problem: Health/Power bars not appearing
+
+```lua
+-- Check if element is registered
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetAllPoints()
+self.Health = Health  -- Don't forget this!
+```
+
+<Warning>
+Elements must be assigned to the frame object (e.g., `self.Health = Health`) for oUF to recognize them.
+</Warning>
+
+**Debugging steps:**
+
+1. Verify element is attached to frame:
+```lua
+print(frame.Health)  -- Should not be nil
+```
+
+2. Check if element is enabled:
+```lua
+print(frame:IsElementEnabled('Health'))  -- Should return true
+```
+
+3. Ensure element has a texture:
+```lua
+print(Health:GetStatusBarTexture())  -- Should not be nil
+```
+
+#### Problem: Auras not displaying
+
+```lua
+-- Common mistake: Wrong filter
+local Buffs = CreateFrame('Frame', nil, self)
+Buffs:SetSize(200, 100)
+Buffs.num = 32
+-- Buffs.filter = 'HARMFUL'  -- WRONG! This shows debuffs
+Buffs.filter = 'HELPFUL'  -- Correct for buffs
+self.Buffs = Buffs
+```
+
+**Debug aura visibility:**
+
+```lua
+function Buffs:PostUpdate(unit)
+    print('Visible buffs:', self.visibleButtons)
+    print('Created buttons:', self.createdButtons)
+end
+```
+
+### Frame Not Updating
+
+#### Problem: Frame shows initial state but doesn't update
+
+This usually means events aren't firing or the unit is wrong.
+
+```lua
+-- Add debug output to update function
+local function Update(self, event, unit)
+    print('Update called:', event, unit, self.unit)
+    if self.unit ~= unit then 
+        print('Unit mismatch!')
+        return 
+    end
+    -- Your update logic
+end
+```
+
+#### Problem: Nameplate frames not working
+
+```lua
+-- Check if nameplate driver is properly initialized
+local nameplates = oUF:SpawnNamePlates('oUF_MyLayout')
+if nameplates then
+    print('Nameplate driver created successfully')
+else
+    print('ERROR: Failed to create nameplate driver')
+end
+```
+
+<Tip>
+Nameplates require `NAME_PLATE_UNIT_ADDED` events to fire. Make sure nameplates are enabled in your settings.
+</Tip>
+
+### Unit Mismatch Errors
+
+#### Problem: Wrong unit being updated
+
+```lua
+-- Debug unit tokens
+local function Update(self, event, unit)
+    print('Frame unit:', self.unit)
+    print('Event unit:', unit)
+    print('Real unit:', SecureButton_GetUnit(self))
+    print('Modified unit:', SecureButton_GetModifiedUnit(self))
+end
+```
+
+#### Problem: Pet/Vehicle swapping issues
+
+The framework handles this automatically, but you can debug:
+
+```lua
+function self:PostUpdate(event)
+    print('Unit changed to:', self.unit)
+    print('Modified unit:', SecureButton_GetModifiedUnit(self))
+end
+```
+
+### Style Not Applied
+
+#### Problem: RegisterStyle/SetActiveStyle issues
+
+```lua
+-- Check style registration
+local function CreateStyle(self, unit)
+    print('Style applied to:', unit)
+    -- Your style code
+end
+
+oUF:RegisterStyle('MyLayout', CreateStyle)
+print('Current active style:', oUF:GetActiveStyle())
+oUF:SetActiveStyle('MyLayout')
+print('After setting:', oUF:GetActiveStyle())
+```
+
+<Warning>
+You must set the active style BEFORE spawning frames. Setting it after won't affect already-spawned frames.
+</Warning>
+
+```lua
+-- Correct order:
+oUF:RegisterStyle('MyLayout', CreateStyle)
+oUF:SetActiveStyle('MyLayout')
+local player = oUF:Spawn('player')  -- Will use MyLayout
+
+-- Wrong order:
+local player = oUF:Spawn('player')  -- Uses default/previous style
+oUF:SetActiveStyle('MyLayout')  -- Too late!
+```
+
+### Tags Not Working
+
+#### Problem: Tag not displaying
+
+```lua
+-- Check tag syntax
+local Name = Health:CreateFontString(nil, 'OVERLAY')
+Name:SetPoint('CENTER')
+
+-- Debug tag
+self:Tag(Name, '[name]')
+print('Tag string:', Name:GetText())
+
+-- Untag and retag to test
+self:Untag(Name)
+self:Tag(Name, '[name]')
+```
+
+#### Problem: Custom tag not found
+
+```lua
+-- Ensure tag is registered before use
+oUF.Tags.Methods['myhealth'] = function(unit)
+    return UnitHealth(unit)
+end
+oUF.Tags.Events['myhealth'] = 'UNIT_HEALTH UNIT_MAXHEALTH'
+
+-- Then use it
+self:Tag(HealthValue, '[myhealth]')
+```
+
+## Debugging Techniques
+
+### Enable Frame Inspection
+
+```lua
+-- Add to your layout to inspect frame state
+local function InspectFrame(frame)
+    print('=== Frame Inspection ===')
+    print('Unit:', frame.unit)
+    print('Exists:', UnitExists(frame.unit))
+    print('IsShown:', frame:IsShown())
+    print('Alpha:', frame:GetAlpha())
+    print('Size:', frame:GetSize())
+    
+    local x, y = frame:GetCenter()
+    print('Position:', x, y)
+    
+    print('\nActive Elements:')
+    for element in pairs(oUF.elements) do
+        if frame:IsElementEnabled(element) then
+            print('  -', element)
+        end
+    end
+end
+
+-- Use in game:
+-- /run InspectFrame(oUF_PlayerFrame)
+```
+
+### Event Monitoring
+
+```lua
+-- Track events for specific frame
+local eventCount = {}
+local originalRegister = frame.RegisterEvent
+
+function frame:RegisterEvent(event, ...)
+    eventCount[event] = 0
+    originalRegister(self, event, ...)
+end
+
+frame:HookScript('OnEvent', function(self, event)
+    eventCount[event] = (eventCount[event] or 0) + 1
+end)
+
+-- Print event counts
+-- /run for event, count in pairs(eventCount) do print(event, count) end
+```
+
+### Element Callback Debugging
+
+```lua
+-- Add to any element
+function Health:PreUpdate(unit)
+    print('Health PreUpdate:', unit)
+end
+
+function Health:PostUpdate(unit, cur, max)
+    print('Health PostUpdate:', unit, cur, max)
+end
+
+function Health:PostUpdateColor(unit, color)
+    print('Health color updated:', unit, color and color:GetRGB())
+end
+```
+
+### Memory Leak Detection
+
+```lua
+local frame = CreateFrame('Frame')
+local lastMemory = 0
+
+frame:SetScript('OnUpdate', function(self, elapsed)
+    self.timer = (self.timer or 0) + elapsed
+    if self.timer >= 5 then
+        UpdateAddOnMemoryUsage()
+        local current = GetAddOnMemoryUsage('oUF_MyLayout')
+        local diff = current - lastMemory
+        
+        if diff > 0 then
+            print(string.format('Memory increased by %.2f KB', diff))
+        end
+        
+        lastMemory = current
+        self.timer = 0
+    end
+end)
+```
+
+## Error Messages
+
+### "Style does not exist"
+
+```
+Error: Style [MyLayout] does not exist.
+```
+
+**Solution:** Register the style before setting it as active:
+
+```lua
+oUF:RegisterStyle('MyLayout', function(self, unit)
+    -- Style code
+end)
+oUF:SetActiveStyle('MyLayout')
+```
+
+### "Unable to create frame. No styles have been registered"
+
+```
+Error: Unable to create frame. No styles have been registered.
+```
+
+**Solution:** Register at least one style before spawning:
+
+```lua
+oUF:RegisterStyle('MyLayout', CreateStyle)
+oUF:SetActiveStyle('MyLayout')
+local player = oUF:Spawn('player', 'oUF_Player')
+```
+
+### "Bad argument to 'X'"
+
+```
+Bad argument #2 to 'EnableElement' (string expected, got nil)
+```
+
+**Solution:** oUF validates arguments. Check the API documentation:
+
+```lua
+-- Wrong:
+frame:EnableElement()  -- Missing element name
+
+-- Correct:
+frame:EnableElement('Health')
+```
+
+### Taint Issues
+
+```
+An action was blocked because of taint...
+```
+
+**Common causes:**
+
+1. **Modifying Blizzard frames in combat**
+```lua
+-- Wrong: Can cause taint
+PlayerFrame:Hide()
+
+-- Correct: Let oUF handle it
+oUF:DisableBlizzard('player')
+```
+
+2. **Setting frame attributes in combat**
+```lua
+if not InCombatLockdown() then
+    frame:SetAttribute('unit', newUnit)
+end
+```
+
+<Warning>
+Never modify secure frames during combat. Queue changes for after combat ends.
+</Warning>
+
+## Frequently Asked Questions
+
+### Why aren't my raid frames showing?
+
+```lua
+-- Check group type
+if IsInRaid() then
+    print('In raid')
+elseif IsInGroup() then
+    print('In party')
+else
+    print('Solo')
+end
+
+-- Ensure header has correct visibility
+local raid = oUF:SpawnHeader(
+    'oUF_Raid',
+    nil,
+    'raid',
+    'showRaid', true,
+    'showPlayer', true,
+    'yOffset', -5
+)
+raid:SetVisibility('raid')  -- or 'raid,party,solo'
+```
+
+### How do I disable an element?
+
+```lua
+-- Disable immediately
+frame:DisableElement('Portrait')
+
+-- Or don't create it in your style
+local function CreateStyle(self, unit)
+    -- Simply don't create self.Portrait
+end
+```
+
+### Why is my frame invisible?
+
+**Checklist:**
+
+1. Frame is shown:
+```lua
+print(frame:IsShown())  -- Should be true
+```
+
+2. Frame has size:
+```lua
+print(frame:GetSize())  -- Should not be 0, 0
+```
+
+3. Frame is on screen:
+```lua
+local x, y = frame:GetCenter()
+print(x, y)  -- Should be valid coordinates
+```
+
+4. Alpha is not 0:
+```lua
+print(frame:GetAlpha())  -- Should be > 0
+```
+
+5. Strata is not below other frames:
+```lua
+frame:SetFrameStrata('MEDIUM')
+```
+
+### How do I force an update?
+
+```lua
+-- Update specific element
+if frame.Health then
+    frame.Health:ForceUpdate()
+end
+
+-- Update all elements
+frame:UpdateAllElements('ForceUpdate')
+```
+
+### Why do my tags show `[name]` literally?
+
+**Missing tag registration:**
+
+```lua
+-- Ensure oUF_Tags is loaded
+if not oUF.Tags then
+    print('ERROR: Tags not loaded!')
+    return
+end
+
+-- Check tag exists
+if not oUF.Tags.Methods['name'] then
+    print('ERROR: name tag not registered!')
+end
+```
+
+## Common Mistakes
+
+### Mistake 1: Not assigning elements
+
+```lua
+-- WRONG: Element created but not assigned
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetAllPoints()
+-- Missing: self.Health = Health
+
+-- CORRECT:
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetAllPoints()
+self.Health = Health  -- This is required!
+```
+
+### Mistake 2: Wrong parent frame
+
+```lua
+-- WRONG: Parent should be the unit frame
+local Power = CreateFrame('StatusBar', nil, UIParent)
+
+-- CORRECT:
+local Power = CreateFrame('StatusBar', nil, self)
+```
+
+### Mistake 3: Setting size after SetAllPoints
+
+```lua
+-- WRONG: SetSize has no effect after SetAllPoints
+Health:SetAllPoints()
+Health:SetSize(200, 20)  -- Ignored!
+
+-- CORRECT: Either use SetAllPoints OR SetSize + SetPoint
+Health:SetPoint('TOP')
+Health:SetPoint('LEFT')
+Health:SetPoint('RIGHT')
+Health:SetHeight(20)
+```
+
+### Mistake 4: Forgetting to enable elements
+
+```lua
+-- Elements are auto-enabled if they exist on spawn
+-- But if you create them later:
+local Health = CreateFrame('StatusBar', nil, frame)
+frame.Health = Health
+frame:EnableElement('Health')  -- Required if added after spawn
+```
+
+### Mistake 5: Spawning in wrong order
+
+```lua
+-- WRONG ORDER:
+local player = oUF:Spawn('player')
+oUF:SetActiveStyle('MyLayout')  -- Too late!
+
+-- CORRECT ORDER:
+oUF:RegisterStyle('MyLayout', CreateStyle)
+oUF:SetActiveStyle('MyLayout')
+local player = oUF:Spawn('player')
+```
+
+## Debug Mode Template
+
+Add this to your layout for comprehensive debugging:
+
+```lua
+local DEBUG = true
+
+local function Debug(...)
+    if DEBUG then
+        print('|cff33ff99[MyLayout]|r', ...)
+    end
+end
+
+local function CreateStyle(self, unit)
+    Debug('Creating frame for:', unit)
+    
+    self:HookScript('OnShow', function()
+        Debug(unit, 'shown')
+    end)
+    
+    self:HookScript('OnHide', function()
+        Debug(unit, 'hidden')
+    end)
+    
+    -- Your style code with debug calls
+    local Health = CreateFrame('StatusBar', nil, self)
+    Debug('Health created for:', unit)
+    
+    function Health:PostUpdate(unit, cur, max)
+        Debug('Health updated:', unit, cur, max)
+    end
+    
+    self.Health = Health
+end
+
+-- Toggle debugging:
+-- /run DEBUG = false
+```
+
+## Getting Help
+
+<Accordion title="Before Asking for Help">
+**Provide this information:**
+
+1. Complete error message (if any)
+2. Minimal code that reproduces the issue
+3. What you expected to happen
+4. What actually happened
+5. Debugging steps you've already tried
+
+**Check these first:**
+
+- [ ] Is oUF up to date?
+- [ ] Are there any Lua errors? (/console scriptErrors 1)
+- [ ] Does the issue occur with just oUF and your layout?
+- [ ] Have you checked the documentation for the element?
+- [ ] Have you looked at example layouts?
+</Accordion>
+
+<Note>
+Most issues come from typos, wrong element names, or forgetting to assign elements to the frame. Double-check the basics first!
+</Note>

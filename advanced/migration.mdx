@@ -1,0 +1,570 @@
+---
+title: Migration Guide
+description: Guide for migrating between oUF versions and handling breaking changes
+---
+
+## Overview
+
+oUF follows a careful development philosophy that minimizes breaking changes, but some are necessary as WoW's API evolves. This guide covers major migrations and version-specific changes.
+
+## Current Version: 11.x+
+
+### Aura System Overhaul (10.0+)
+
+The aura system was completely rewritten to use WoW's new `C_UnitAuras` API.
+
+#### Breaking Changes
+
+**Old API (removed):**
+```lua
+-- No longer works!
+UnitBuff(unit, index)
+UnitDebuff(unit, index)
+```
+
+**New API:**
+```lua
+-- Auras now use AuraData objects
+local data = C_UnitAuras.GetAuraDataBySlot(unit, slot)
+-- data.name, data.icon, data.auraInstanceID, etc.
+```
+
+#### Migration for Custom Aura Handling
+
+**Before:**
+```lua
+function Buffs:PostUpdateIcon(unit, button, index)
+    local name, icon, count, debuffType, duration, expirationTime = UnitBuff(unit, index)
+    
+    if myCustomCondition(name) then
+        button:SetAlpha(1)
+    end
+end
+```
+
+**After:**
+```lua
+function Buffs:PostUpdateButton(button, unit, data, position)
+    -- data is an AuraData table with all info
+    if myCustomCondition(data.name) then
+        button:SetAlpha(1)
+    end
+end
+```
+
+<Warning>
+`PostUpdateIcon` was renamed to `PostUpdateButton` and has a different signature. Update all custom callbacks.
+</Warning>
+
+#### Aura Filtering Changes
+
+**Before:**
+```lua
+function Buffs:CustomFilter(unit, button, name, ...)
+    return name == 'Rejuvenation'
+end
+```
+
+**After:**
+```lua
+function Buffs:FilterAura(unit, data)
+    return data.name == 'Rejuvenation'
+    -- Or better, use spell ID:
+    return data.spellId == 774
+end
+```
+
+#### Aura Attributes
+
+**Changed attributes:**
+
+| Old | New | Notes |
+|-----|-----|-------|
+| `button.name` | `button.auraInstanceID` | Unique identifier |
+| Uses index | Uses `auraInstanceID` | More reliable |
+| `button.filter` | `data.isHarmfulAura` | Boolean flag |
+
+**Example migration:**
+
+```lua
+-- Before:
+function Buffs:PostUpdateIcon(unit, button, index)
+    if button.name == 'Renew' then
+        button:SetSize(32, 32)
+    end
+end
+
+-- After:
+function Buffs:PostUpdateButton(button, unit, data, position)
+    if data.spellId == 139 then  -- Renew
+        button:SetSize(32, 32)
+    end
+end
+```
+
+### Health Prediction Merged (11.0+)
+
+The `HealthPrediction` element was merged into `Health`.
+
+#### Migration
+
+**Before:**
+```lua
+local Health = CreateFrame('StatusBar', nil, self)
+self.Health = Health
+
+local HealPrediction = CreateFrame('StatusBar', nil, Health)
+self.HealPrediction = HealPrediction
+self.HealPrediction.myBar = CreateFrame('StatusBar', nil, Health)
+```
+
+**After:**
+```lua
+local Health = CreateFrame('StatusBar', nil, self)
+self.Health = Health
+
+-- Sub-widgets now belong to Health element
+local HealingAll = CreateFrame('StatusBar', nil, Health)
+Health.HealingAll = HealingAll
+
+-- Or specific healing types:
+Health.HealingPlayer = CreateFrame('StatusBar', nil, Health)
+Health.HealingOther = CreateFrame('StatusBar', nil, Health)
+```
+
+**Absorb widgets:**
+
+```lua
+-- Before: Separate element
+self.HealPrediction = {...}
+self.HealPrediction.absorbBar = CreateFrame('StatusBar', nil, Health)
+
+-- After: Part of Health
+Health.DamageAbsorb = CreateFrame('StatusBar', nil, Health)
+Health.HealAbsorb = CreateFrame('StatusBar', nil, Health)
+```
+
+<Tip>
+The new system uses WoW's `CreateUnitHealPredictionCalculator` for more accurate predictions.
+</Tip>
+
+### Power Prediction Merged (11.0+)
+
+Similar to health prediction, power prediction is now integrated.
+
+**Before:**
+```lua
+self.PowerPrediction = CreateFrame('StatusBar', nil, Power)
+self.PowerPrediction.mainBar = CreateFrame('StatusBar', nil, Power)
+```
+
+**After:**
+```lua
+local Power = CreateFrame('StatusBar', nil, self)
+Power.CostPrediction = CreateFrame('StatusBar', nil, Power)
+Power.CostPrediction:SetReverseFill(true)
+self.Power = Power
+```
+
+### Alternative Power Handling
+
+Handling of alternative power bars has changed.
+
+**Before:**
+```lua
+self.AlternativePower = CreateFrame('StatusBar', nil, self)
+```
+
+**After:**
+```lua
+-- Now part of the Power element with option
+local Power = CreateFrame('StatusBar', nil, self)
+Power.displayAltPower = true  -- Show alt power when available
+self.Power = Power
+```
+
+## Migration from 9.x to 10.x+
+
+### Smooth StatusBar Updates
+
+WoW added native StatusBar smoothing.
+
+**Before:**
+```lua
+-- Custom smoothing via OnUpdate
+local smoothing = 0.25
+function Health:SetValue(value)
+    -- Custom smoothing logic
+end
+```
+
+**After:**
+```lua
+-- Use built-in smoothing
+Health.smoothing = Enum.StatusBarInterpolation.Linear
+-- or Enum.StatusBarInterpolation.Smooth
+
+-- Then simply:
+element:SetValue(cur, element.smoothing)
+```
+
+<Accordion title="Smoothing Migration Example">
+```lua
+-- Old custom smoothing
+local function SmoothBar(bar, value)
+    local min, max = bar:GetMinMaxValues()
+    local old = bar:GetValue()
+    if old ~= value then
+        bar:SetScript('OnUpdate', function(self, elapsed)
+            local cur = self:GetValue()
+            local new = cur + (value - cur) * min(1, elapsed * 5)
+            if abs(new - value) < 0.01 then
+                self:SetValue(value)
+                self:SetScript('OnUpdate', nil)
+            else
+                self:SetValue(new)
+            end
+        end)
+    end
+end
+
+-- New built-in smoothing
+local function Update(self, event, unit)
+    local cur = UnitHealth(unit)
+    self.Health:SetValue(cur, Enum.StatusBarInterpolation.Linear)
+end
+```
+</Accordion>
+
+### Color System Updates
+
+Colors now use ColorMixin.
+
+**Before:**
+```lua
+self.colors.power['MANA'] = {0, 0.5, 1}
+```
+
+**After:**
+```lua
+self.colors.power['MANA'] = CreateColor(0, 0.5, 1)
+-- or
+self.colors.power['MANA'] = {r = 0, g = 0.5, b = 1}
+```
+
+**Using colors:**
+
+```lua
+-- Before:
+local r, g, b = unpack(color)
+bar:SetStatusBarColor(r, g, b)
+
+-- After:
+bar:SetStatusBarColor(color:GetRGB())
+-- or still works:
+local r, g, b = color:GetRGB()
+bar:SetStatusBarColor(r, g, b)
+```
+
+## Migration from 8.x to 9.x
+
+### Nameplate Changes
+
+Nameplate creation was streamlined.
+
+**Before:**
+```lua
+oUF:SpawnNamePlates('oUF_MyLayout', function(self, unit)
+    -- Style function
+end)
+```
+
+**After:**
+```lua
+-- Style is set globally, not per-nameplate
+oUF:RegisterStyle('MyLayout', function(self, unit)
+    -- Style function
+end)
+oUF:SetActiveStyle('MyLayout')
+local nameplates = oUF:SpawnNamePlates('oUF_MyLayout')
+```
+
+### Unit Watch Changes
+
+**Before:**
+```lua
+RegisterUnitWatch(frame, true)  -- Show on unit exists
+```
+
+**After:**
+```lua
+frame:Enable(false)  -- Show/hide based on unit exists
+-- or
+frame:Enable(true)   -- Use state driver
+```
+
+## Deprecated Features
+
+### Removed in 11.0
+
+- `HealthPrediction` element (merged into `Health`)
+- `PowerPrediction` element (merged into `Power`) 
+- Old aura API functions
+- Custom smooth bar implementations
+
+### Removed in 10.0
+
+- `UnitBuff`/`UnitDebuff` iteration (use `C_UnitAuras`)
+- Individual aura callbacks (use unified callbacks)
+
+## Breaking Change Timeline
+
+<Accordion title="Version History">
+
+### 11.0 (Current)
+- Merged HealthPrediction into Health
+- Merged PowerPrediction into Power
+- Updated for The War Within
+
+### 10.0 (Dragonflight)
+- Complete aura system rewrite
+- New `C_UnitAuras` API
+- ColorMixin integration
+- Native StatusBar smoothing
+
+### 9.0 (Shadowlands)
+- Nameplate API changes
+- Unit watch updates
+- Performance improvements
+
+### 8.0 (Battle for Astra)
+- GCD indicator support
+- Azerite power element
+
+</Accordion>
+
+## General Migration Strategy
+
+### Step 1: Check for Errors
+
+Enable Lua errors to find breaking changes:
+
+```lua
+/console scriptErrors 1
+/reload
+```
+
+### Step 2: Update Element Names
+
+Search your layout for old element names:
+
+```lua
+-- Find and replace:
+'HealthPrediction' → Part of 'Health' element
+'PowerPrediction' → Part of 'Power' element
+'PostUpdateIcon' → 'PostUpdateButton'
+'CustomFilter' → 'FilterAura'
+```
+
+### Step 3: Update Callbacks
+
+Update callback signatures:
+
+```lua
+-- Old aura callback
+function element:PostUpdateIcon(unit, button, index, position)
+    -- ...
+end
+
+-- New aura callback  
+function element:PostUpdateButton(button, unit, data, position)
+    -- ...
+end
+```
+
+### Step 4: Test Thoroughly
+
+- Test with different units (player, target, party, raid)
+- Test in different scenarios (solo, group, raid)
+- Check memory usage
+- Profile performance
+
+## Common Migration Errors
+
+### Error: "attempt to index field 'HealthPrediction'"
+
+```lua
+-- Before:
+if self.HealthPrediction then
+    self.HealthPrediction.myBar:SetStatusBarColor(0, 1, 0)
+end
+
+-- After:
+if self.Health.HealingAll then
+    self.Health.HealingAll:SetStatusBarColor(0, 1, 0)
+end
+```
+
+### Error: "PostUpdateIcon is not a function"
+
+```lua
+-- Rename callback:
+function Buffs:PostUpdateButton(button, unit, data, position)
+    -- Update logic
+end
+```
+
+### Error: "attempt to call field 'UnitBuff'"
+
+```lua
+-- Before:
+for i = 1, 40 do
+    local name = UnitBuff(unit, i)
+end
+
+-- After: oUF handles auras automatically
+-- Just use the Buffs element
+local Buffs = CreateFrame('Frame', nil, self)
+Buffs.num = 40
+self.Buffs = Buffs
+```
+
+## Compatibility Layer (Temporary)
+
+While migrating, you can add temporary compatibility:
+
+```lua
+-- Temporary wrapper for old code
+local function HealthPredictionCompat(self)
+    if not self.HealthPrediction and self.Health then
+        self.HealthPrediction = {
+            myBar = self.Health.HealingAll,
+            otherBar = self.Health.HealingOther,
+            absorbBar = self.Health.DamageAbsorb,
+        }
+    end
+end
+
+-- Call after creating frames
+oUF:RegisterInitCallback(HealthPredictionCompat)
+```
+
+<Warning>
+Compatibility layers are for temporary migration only. Remove them once you've updated your code.
+</Warning>
+
+## Best Practices for Future Migrations
+
+### 1. Follow Semantic Versioning
+
+Monitor oUF releases:
+
+- **Patch versions** (11.0.x): Bug fixes, safe to update
+- **Minor versions** (11.x): New features, mostly compatible  
+- **Major versions** (x.0): Potential breaking changes
+
+### 2. Read Changelogs
+
+Always review the changelog before updating:
+
+```
+https://github.com/oUF-wow/oUF/releases
+```
+
+### 3. Use Version Checks
+
+```lua
+local oufVersion = tonumber(oUF.version:match('%d+'))
+
+if oufVersion >= 11 then
+    -- Use new API
+    Health.HealingAll = CreateFrame('StatusBar', nil, Health)
+else
+    -- Use old API
+    self.HealthPrediction = CreateFrame('StatusBar', nil, Health)
+end
+```
+
+### 4. Avoid Deprecated APIs
+
+Don't use features marked as deprecated:
+
+```lua
+-- Deprecated (will be removed):
+element.cur  -- Use element.values:GetCurrentHealth()
+element.max  -- Use element.values:GetMaximumHealth()
+
+-- Current:
+local cur = element.values:GetCurrentHealth()
+local max = element.values:GetMaximumHealth()
+```
+
+### 5. Keep Layouts Simple
+
+Simpler layouts are easier to migrate:
+
+- Use standard elements when possible
+- Minimize custom overrides
+- Document any unusual patterns
+
+## Testing Your Migration
+
+### Checklist
+
+<Accordion title="Migration Testing Checklist">
+- [ ] No Lua errors on load
+- [ ] All frames appear correctly
+- [ ] Health bars update properly  
+- [ ] Power bars update properly
+- [ ] Auras display and update
+- [ ] Healing/absorb predictions work
+- [ ] Castbars function correctly
+- [ ] Tags display proper values
+- [ ] Colors are correct
+- [ ] Performance is acceptable
+- [ ] Works in solo/party/raid
+- [ ] Nameplates work (if used)
+- [ ] Memory usage is reasonable
+</Accordion>
+
+### Regression Testing
+
+```lua
+local tests = {
+    function() assert(oUF_PlayerFrame.Health ~= nil) end,
+    function() assert(oUF_PlayerFrame:IsElementEnabled('Health')) end,
+    function() assert(oUF_PlayerFrame.Health:IsShown()) end,
+    -- Add more tests
+}
+
+for i, test in ipairs(tests) do
+    local success, err = pcall(test)
+    if not success then
+        print('Test', i, 'failed:', err)
+    end
+end
+```
+
+## Getting Migration Help
+
+<Note>
+If you're stuck on a migration:
+
+1. Check the [oUF GitHub Discussions](https://github.com/oUF-wow/oUF/discussions)
+2. Search for similar issues in the [issue tracker](https://github.com/oUF-wow/oUF/issues)
+3. Look at how other layouts handled the migration
+4. Ask in the WoW UI & Macro forums
+
+Provide your current code and the error messages you're seeing.
+</Note>
+
+## Summary
+
+Most migrations involve:
+
+1. **Renaming elements** - Old elements merged into new ones
+2. **Updating callbacks** - New signatures and parameters
+3. **API changes** - New WoW APIs replace old ones
+4. **Testing** - Ensure everything works as expected
+
+The oUF team tries to minimize breaking changes, but they're sometimes necessary for performance, new features, or WoW API updates. Stay informed and update carefully.

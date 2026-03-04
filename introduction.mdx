@@ -1,0 +1,162 @@
+---
+title: "Introduction to oUF"
+description: "Learn what oUF is, why you should use it, and how it simplifies unit frame development for World of Warcraft"
+---
+
+## What is oUF?
+
+oUF is a **unit frame framework** for World of Warcraft addons. It provides a powerful foundation for creating custom unit frames without having to write all the repetitive event handling and update logic yourself.
+
+<Note>
+oUF is a framework, not a standalone addon. By itself, oUF doesn't display any frames—you need to create or download a **layout** that uses oUF to define how frames should look and behave.
+</Note>
+
+## Why Use oUF?
+
+Building unit frames from scratch requires handling dozens of events, managing updates, and dealing with edge cases. oUF handles all the boring parts so you can focus on what matters: **designing beautiful, functional frames**.
+
+<CardGroup cols={2}>
+  <Card title="Event-Driven Updates" icon="bolt">
+    Automatic updates when health, power, auras, or other unit properties change. No manual event registration needed.
+  </Card>
+  <Card title="30+ Built-in Elements" icon="cube">
+    Pre-built components for health, power, auras, castbar, portraits, and much more.
+  </Card>
+  <Card title="Flexible Styling" icon="palette">
+    Complete control over appearance with style functions. Position, size, and customize every element.
+  </Card>
+  <Card title="High Performance" icon="gauge">
+    Efficient event handling and update batching keeps your frames running smoothly.
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Elements System
+
+Elements are reusable components that handle specific aspects of a unit frame. oUF includes elements for:
+
+- **Bars**: Health, Power, Castbar, ClassPower, Stagger
+- **Indicators**: Leader, Assistant, Role, PvP, Combat, Resting
+- **Visual**: Portrait, Auras, RaidTarget, Phase
+- **Prediction**: Health/Power prediction, Absorbs
+- **And many more**: Totems, Runes, Tags, Range, Threat
+
+Each element automatically:
+- Registers the necessary game events
+- Updates when those events fire
+- Handles edge cases and special unit types
+- Provides customization options
+
+### Style Functions
+
+Your layout is defined by a **style function**—a regular Lua function that receives a frame and sets up its elements:
+
+```lua
+local function MyStyle(frame, unit)
+  -- Create and configure elements
+  local Health = CreateFrame('StatusBar', nil, frame)
+  Health:SetHeight(20)
+  Health:SetPoint('TOP')
+  Health:SetPoint('LEFT')
+  Health:SetPoint('RIGHT')
+  Health.colorHealth = true
+  
+  frame.Health = Health
+end
+
+oUF:RegisterStyle('MyLayout', MyStyle)
+oUF:SetActiveStyle('MyLayout')
+```
+
+### Unit Frame Spawning
+
+Once you've registered a style, spawn frames for any unit:
+
+```lua
+oUF:Spawn('player', 'oUF_Player')
+oUF:Spawn('target', 'oUF_Target')
+oUF:Spawn('pet', 'oUF_Pet')
+oUF:Spawn('focus', 'oUF_Focus')
+```
+
+For groups (party/raid), use headers:
+
+```lua
+local party = oUF:SpawnHeader(
+  nil, nil,
+  'showParty', true,
+  'yOffset', -5
+)
+```
+
+## Architecture Overview
+
+oUF uses an event-driven architecture:
+
+<Steps>
+  <Step title="Style Registration">
+    You register a style function that defines how frames should be created and configured.
+  </Step>
+  <Step title="Frame Spawning">
+    Call `oUF:Spawn()` or `oUF:SpawnHeader()` to create unit frames using your active style.
+  </Step>
+  <Step title="Element Initialization">
+    oUF automatically enables all elements you've added to the frame (Health, Power, etc.).
+  </Step>
+  <Step title="Automatic Updates">
+    When game events fire (UNIT_HEALTH, UNIT_POWER, etc.), oUF calls the appropriate element update functions.
+  </Step>
+</Steps>
+
+## Who Should Use oUF?
+
+oUF is perfect if you want to:
+
+- **Create custom unit frames** without writing event handling code
+- **Build a unit frame addon** for public release
+- **Learn addon development** with a well-structured framework
+- **Customize existing layouts** by understanding how they work
+
+<Warning>
+oUF requires basic Lua programming knowledge. If you're new to WoW addon development, consider reading the [WoW Programming wiki](https://warcraft.wiki.gg/wiki/World_of_Warcraft_API) first.
+</Warning>
+
+## What You'll Learn
+
+This documentation covers:
+
+- **Core Concepts**: Styles, elements, units, and events (/concepts/architecture)
+- **Creating Layouts**: Step-by-step guide to building frames (/guides/creating-layout)
+- **API Reference**: Complete documentation of all methods and elements (/api/ouf)
+- **Advanced Topics**: Performance, troubleshooting, and custom elements
+
+## Example Layouts
+
+Many popular unit frame addons are built with oUF:
+
+- **oUF_Phanx**: Clean, minimalist frames
+- **oUF_Drk**: Feature-rich raid frames
+- **oUF_Freebgrid**: Compact grid-style raid frames
+- **And hundreds more** on WoWInterface and CurseForge
+
+<Tip>
+Studying existing oUF layouts is a great way to learn advanced techniques. Most are open source on GitHub.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Download and install oUF to get started
+  </Card>
+  <Card title="Quickstart Tutorial" icon="rocket" href="/quickstart">
+    Build your first working unit frame
+  </Card>
+  <Card title="Architecture Guide" icon="sitemap" href="/concepts/architecture">
+    Understand how oUF works under the hood
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/ouf">
+    Explore all available methods and options
+  </Card>
+</CardGroup>

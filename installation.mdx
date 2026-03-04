@@ -1,0 +1,244 @@
+---
+title: "Installation"
+description: "Download and install oUF for World of Warcraft addon development"
+---
+
+## Download oUF
+
+oUF is available from two primary sources:
+
+<CardGroup cols={2}>
+  <Card title="WoWInterface" icon="download" href="https://www.wowinterface.com/downloads/info9994-oUF.html">
+    Direct download from WoWInterface
+  </Card>
+  <Card title="CurseForge" icon="download" href="https://www.curseforge.com/wow/addons/ouf">
+    Download via CurseForge or the CurseForge app
+  </Card>
+</CardGroup>
+
+<Note>
+Both sources provide the same official oUF release. Choose whichever is more convenient for you.
+</Note>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Download oUF">
+    Download the latest version from [WoWInterface](https://www.wowinterface.com/downloads/info9994-oUF.html) or [CurseForge](https://www.curseforge.com/wow/addons/ouf).
+    
+    <Tip>
+    If you use an addon manager (CurseForge app, WoWUp, etc.), you can install oUF directly through the app by searching for "oUF".
+    </Tip>
+  </Step>
+  
+  <Step title="Extract to AddOns folder">
+    Extract the downloaded archive to your World of Warcraft AddOns directory:
+    
+    ```bash
+    # Windows (Retail)
+    C:\Program Files (x86)\World of Warcraft\_retail_\Interface\AddOns\
+    
+    # Windows (Classic)
+    C:\Program Files (x86)\World of Warcraft\_classic_\Interface\AddOns\
+    
+    # macOS
+    /Applications/World of Warcraft/_retail_/Interface/AddOns/
+    ```
+    
+    After extraction, you should have a folder named `oUF` containing:
+    - `oUF.toc` - Table of contents file
+    - `oUF.xml` - Main loader file
+    - `oUF.lua` - Core framework code
+    - Additional `.lua` files for elements and utilities
+  </Step>
+  
+  <Step title="Verify installation">
+    Launch World of Warcraft and check the AddOns list at the character selection screen. You should see **oUF** listed.
+    
+    <Warning>
+    oUF will appear as "disabled" or "load on demand" because it's a framework. This is normal—it doesn't create frames by itself.
+    </Warning>
+  </Step>
+</Steps>
+
+## Version Compatibility
+
+oUF supports multiple versions of World of Warcraft:
+
+| WoW Version | oUF Support |
+|-------------|-------------|
+| **Retail** (The War Within) | ✅ Fully supported |
+| **Cataclysm Classic** | ✅ Fully supported |
+| **Classic Era** | ✅ Fully supported |
+
+<Info>
+The same oUF download works across all WoW versions. The framework automatically detects your client version and adjusts accordingly.
+</Info>
+
+## Creating Your Layout Addon
+
+Since oUF is a framework, you need to create a separate addon that uses it. Here's how:
+
+### 1. Create Addon Folder
+
+Create a new folder in your AddOns directory for your layout:
+
+```bash
+Interface/AddOns/oUF_YourLayout/
+```
+
+<Tip>
+Follow the naming convention `oUF_LayoutName` to make it clear your addon is an oUF layout.
+</Tip>
+
+### 2. Create TOC File
+
+Create `oUF_YourLayout.toc` with the following content:
+
+```lua
+## Interface: 120001
+## Title: oUF YourLayout
+## Author: YourName
+## Version: 1.0
+## Notes: My custom oUF layout
+## Dependencies: oUF
+
+core.lua
+```
+
+<Warning>
+The `## Dependencies: oUF` line is **required**. This tells WoW to load oUF before your layout.
+</Warning>
+
+### 3. Create Core Lua File
+
+Create `core.lua` where you'll define your style and spawn frames:
+
+```lua
+local _, ns = ...
+local oUF = ns.oUF or oUF
+
+-- Your style function goes here
+local function MyStyle(frame, unit)
+  -- Define your frame appearance
+end
+
+-- Register and activate your style
+oUF:RegisterStyle('MyLayout', MyStyle)
+oUF:SetActiveStyle('MyLayout')
+
+-- Spawn frames after PLAYER_LOGIN
+local f = CreateFrame('Frame')
+f:RegisterEvent('PLAYER_LOGIN')
+f:SetScript('OnEvent', function()
+  oUF:Spawn('player', 'oUF_Player')
+  oUF:Spawn('target', 'oUF_Target')
+end)
+```
+
+### 4. Enable Your Addon
+
+1. Reload WoW or type `/reload` in-game
+2. Check the AddOns list—you should now see both **oUF** and **oUF YourLayout**
+3. Enable your layout addon
+4. Log in to see your frames!
+
+## Embedding oUF
+
+If you want to distribute your layout without requiring users to download oUF separately, you can embed it:
+
+<Accordion title="How to Embed oUF">
+  
+### Embedding Steps
+
+1. **Copy oUF files** into your addon directory:
+   ```bash
+   oUF_YourLayout/
+   ├── libs/
+   │   └── oUF/
+   │       ├── oUF.xml
+   │       ├── oUF.lua
+   │       └── ... (all oUF files)
+   ├── oUF_YourLayout.toc
+   └── core.lua
+   ```
+
+2. **Update your TOC** to load oUF:
+   ```lua
+   ## Interface: 120001
+   ## Title: oUF YourLayout
+   ## Author: YourName
+   ## Version: 1.0
+   ## X-oUF: oUF_YourLayout
+   
+   libs\oUF\oUF.xml
+   core.lua
+   ```
+
+3. **Set unique namespace** in your `core.lua`:
+   ```lua
+   local _, ns = ...
+   local oUF = ns.oUF  -- Use embedded version
+   ```
+
+<Warning>
+When embedding, set a unique `X-oUF` identifier (e.g., `oUF_YourLayout`) to avoid conflicts with other embedded copies.
+</Warning>
+
+For more details, see the [Embedding Guide](https://github.com/oUF-wow/oUF/wiki/Embedding).
+
+</Accordion>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="oUF not appearing in AddOns list">
+    - Verify the `oUF` folder is directly in `Interface/AddOns/`
+    - Check that `oUF.toc` exists and isn't corrupted
+    - Make sure the folder isn't nested (e.g., `AddOns/oUF-master/oUF/`)
+    - Try deleting `Cache` folder in your WoW directory
+  </Accordion>
+  
+  <Accordion title="'Dependencies: oUF' error when loading my layout">
+    - Ensure oUF is installed correctly
+    - Enable oUF in the AddOns list
+    - Check for typos in the TOC file (`Dependencies: oUF` not `Dependency`)
+    - If embedding, remove the Dependencies line and use `X-oUF` instead
+  </Accordion>
+  
+  <Accordion title="Frames not appearing in-game">
+    - Check if your layout addon is enabled
+    - Look for Lua errors (install BugSack addon to catch them)
+    - Verify you're spawning frames after `PLAYER_LOGIN`
+    - Make sure you've set an active style before spawning
+  </Accordion>
+  
+  <Accordion title="Version out of date error">
+    The `## Interface` version in your TOC may be outdated. Update it to match the current game version:
+    
+    - **Retail (11.0.x)**: `120001`
+    - **Cataclysm Classic**: `40400`
+    - **Classic Era**: `11503`
+    
+    Or enable "Load out of date AddOns" at character selection.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that oUF is installed, you're ready to build your first layout!
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Tutorial" icon="rocket" href="/quickstart">
+    Create your first working unit frame
+  </Card>
+  <Card title="Creating Layouts" icon="palette" href="/guides/creating-layout">
+    Comprehensive guide to building custom layouts
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Learn how oUF works under the hood
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/ouf">
+    Explore all available methods and options
+  </Card>
+</CardGroup>

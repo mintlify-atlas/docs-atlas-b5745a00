@@ -1,80 +1,275 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Create your first oUF unit frame layout in minutes"
 ---
 
-## Get started in three steps
-
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide will walk you through creating a simple but functional oUF layout from scratch. By the end, you'll have working player and target frames with health and power bars.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  This tutorial assumes you have already [installed oUF](/installation). If not, install it first before continuing.
 </Note>
+
+## Create Your Layout Addon
+
+<Steps>
+  <Step title="Create addon directory">
+    Create a new folder in your `Interface/AddOns/` directory. For this tutorial, we'll call it `MyLayout`:
+    
+    ```
+    World of Warcraft/
+    └── Interface/
+        └── AddOns/
+            └── MyLayout/
+    ```
+  </Step>
+
+  <Step title="Create the TOC file">
+    Create `MyLayout.toc` with the following content:
+    
+    ```lua MyLayout.toc
+    ## Interface: 120001
+    ## Title: MyLayout
+    ## Author: YourName
+    ## Version: 1.0
+    ## Notes: My first oUF layout
+    ## Dependencies: oUF
+    
+    core.lua
+    ```
+    
+    <Info>The `Dependencies: oUF` line ensures oUF loads before your layout.</Info>
+  </Step>
+
+  <Step title="Create the core file">
+    Create `core.lua` - this is where your layout code will go. We'll fill this in the next section.
+  </Step>
+</Steps>
+
+## Write Your First Style
+
+Now let's create a simple style function that adds health and power bars to frames. Add this to your `core.lua` file:
+
+```lua core.lua
+-- Wait for the game to be fully loaded
+local function OnLogin()
+    -- Define your style function
+    local function MyStyle(self, unit)
+        -- Set frame size
+        self:SetSize(200, 50)
+        
+        -- Create Health bar
+        local Health = CreateFrame('StatusBar', nil, self)
+        Health:SetHeight(30)
+        Health:SetPoint('TOP')
+        Health:SetPoint('LEFT')
+        Health:SetPoint('RIGHT')
+        Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+        
+        -- Configure health colors
+        Health.colorClass = true
+        Health.colorReaction = true
+        
+        -- Add health value text
+        local HealthValue = Health:CreateFontString(nil, 'OVERLAY')
+        HealthValue:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+        HealthValue:SetPoint('CENTER', Health)
+        Health.value = HealthValue
+        
+        -- Attach to frame
+        self.Health = Health
+        
+        -- Create Power bar
+        local Power = CreateFrame('StatusBar', nil, self)
+        Power:SetHeight(15)
+        Power:SetPoint('TOP', Health, 'BOTTOM', 0, -2)
+        Power:SetPoint('LEFT')
+        Power:SetPoint('RIGHT')
+        Power:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+        
+        -- Configure power colors
+        Power.colorPower = true
+        
+        -- Add power value text
+        local PowerValue = Power:CreateFontString(nil, 'OVERLAY')
+        PowerValue:SetFont('Fonts\\FRIZQT__.TTF', 10, 'OUTLINE')
+        PowerValue:SetPoint('CENTER', Power)
+        Power.value = PowerValue
+        
+        -- Attach to frame
+        self.Power = Power
+        
+        -- Add unit name
+        local Name = self:CreateFontString(nil, 'OVERLAY')
+        Name:SetFont('Fonts\\FRIZQT__.TTF', 14, 'OUTLINE')
+        Name:SetPoint('BOTTOM', self, 'TOP', 0, 5)
+        self:Tag(Name, '[name]')
+    end
+    
+    -- Register the style with oUF
+    oUF:RegisterStyle('MyLayout', MyStyle)
+    
+    -- Set it as the active style
+    oUF:SetActiveStyle('MyLayout')
+    
+    -- Spawn the frames
+    local player = oUF:Spawn('player', 'oUF_Player')
+    player:SetPoint('CENTER', UIParent, -250, -200)
+    
+    local target = oUF:Spawn('target', 'oUF_Target')
+    target:SetPoint('CENTER', UIParent, 250, -200)
+end
+
+-- Register for login event
+local frame = CreateFrame('Frame')
+frame:RegisterEvent('PLAYER_LOGIN')
+frame:SetScript('OnEvent', OnLogin)
+```
+
+## Test Your Layout
+
+<Steps>
+  <Step title="Reload the game">
+    Exit World of Warcraft completely and restart it, or use the `/reload` command.
+  </Step>
+
+  <Step title="Check for errors">
+    Look for any error messages. If you see red text, check your code for typos.
+    
+    <Tip>Enable "Display Lua Errors" in Interface Options > Help for debugging.</Tip>
+  </Step>
+
+  <Step title="Find your frames">
+    You should see two new unit frames appear:
+    - **Player frame** on the left side of your screen
+    - **Target frame** on the right side
+    
+    The health bars will be colored based on class (friendly) or reaction (hostile).
+  </Step>
+</Steps>
+
+## Understanding the Code
+
+Let's break down what each part does:
+
+### Style Function
+
+The style function (`MyStyle`) is called for each frame you spawn. It receives:
+- `self` - The unit frame being styled
+- `unit` - The unit string (e.g., "player", "target")
+
+### Health Element
+
+```lua
+Health.colorClass = true
+Health.colorReaction = true
+```
+
+These options tell oUF to automatically color the health bar:
+- `colorClass` - Color by class for friendly units
+- `colorReaction` - Color by reaction (hostile, neutral, friendly)
+
+### Power Element
+
+```lua
+Power.colorPower = true
+```
+
+This colors the power bar based on power type (mana = blue, energy = yellow, rage = red, etc.).
+
+### Tags
+
+```lua
+self:Tag(Name, '[name]')
+```
+
+Tags are dynamic text formatters. The `[name]` tag displays the unit's name. See the [Tags documentation](/elements/tags) for more options.
+
+## Customize Your Layout
+
+Now that you have a working layout, try these customizations:
+
+<Accordion title="Add a backdrop">
+```lua
+Health:SetBackdrop({
+    bgFile = 'Interface\\Buttons\\WHITE8X8',
+    insets = {top = -1, left = -1, bottom = -1, right = -1}
+})
+Health:SetBackdropColor(0, 0, 0, 0.5)
+```
+</Accordion>
+
+<Accordion title="Change frame positions">
+```lua
+-- Position player frame in bottom left
+player:SetPoint('BOTTOMLEFT', UIParent, 50, 150)
+
+-- Position target frame next to player
+target:SetPoint('LEFT', player, 'RIGHT', 50, 0)
+```
+</Accordion>
+
+<Accordion title="Add health percentage text">
+```lua
+-- Replace the health value tag with:
+self:Tag(HealthValue, '[perhp]%')
+```
+</Accordion>
+
+<Accordion title="Make frames larger">
+```lua
+-- Change the SetSize values:
+self:SetSize(250, 60)  -- Width, Height
+Health:SetHeight(40)
+Power:SetHeight(15)
+```
+</Accordion>
+
+## Common Issues
+
+<Warning>
+  **Frames not appearing?** Check that:
+  - oUF is installed correctly
+  - Your TOC has `## Dependencies: oUF`
+  - You've reloaded after making changes
+  - There are no Lua errors (enable error display)
+</Warning>
+
+<Accordion title="Health bar not colored correctly">
+  Make sure you're setting the color options **before** attaching the element to the frame:
+  
+  ```lua
+  Health.colorClass = true  -- Set options first
+  self.Health = Health      -- Then attach
+  ```
+</Accordion>
+
+<Accordion title="Text not showing">
+  Check that the font path is correct. If `FRIZQT__.TTF` doesn't work, try:
+  
+  ```lua
+  HealthValue:SetFont('Fonts\\ARIALN.TTF', 12, 'OUTLINE')
+  ```
+</Accordion>
+
+<Accordion title="Power bar showing for units without power">
+  This is normal - oUF automatically hides the power bar when a unit has no power resource.
+</Accordion>
+
+## Next Steps
+
+Congratulations! You've created your first oUF layout. Here's what to explore next:
+
+<CardGroup cols={2}>
+  <Card title="Add More Elements" icon="puzzle-piece" href="/elements/overview">
+    Explore 30+ built-in elements like auras, castbar, and portraits
+  </Card>
+  <Card title="Style Your Frames" icon="palette" href="/guides/styling-frames">
+    Learn positioning, textures, colors, and fonts
+  </Card>
+  <Card title="Create Party Frames" icon="users" href="/guides/creating-layout">
+    Spawn group frames for party and raid
+  </Card>
+  <Card title="Custom Elements" icon="code" href="/guides/custom-elements">
+    Build your own custom elements
+  </Card>
+</CardGroup>

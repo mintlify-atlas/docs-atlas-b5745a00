@@ -1,0 +1,374 @@
+---
+title: 'Factory API'
+description: 'Delayed initialization and queue management for unit frame spawning'
+---
+
+## Overview
+
+The Factory API provides a mechanism to delay frame spawning and initialization until the player is fully logged in. This is useful for addons that need to ensure all game data is available before creating frames.
+
+<Note>
+  The factory is enabled by default and automatically processes queued functions on `PLAYER_LOGIN`.
+</Note>
+
+---
+
+## Factory Methods
+
+### Factory
+
+Executes a function immediately if logged in and the factory is active, otherwise queues it for later execution.
+
+```lua
+oUF:Factory(func)
+```
+
+<ParamField path="func" type="function" required>
+  Function to execute or queue. Receives the `oUF` object as its first parameter.
+</ParamField>
+
+**Behavior:**
+- If the player is logged in **and** the factory is active: executes `func(oUF)` immediately
+- Otherwise: adds the function to a queue for later execution
+
+**Example:**
+
+```lua
+oUF:Factory(function(oUF)
+  oUF:RegisterStyle('MyLayout', MyStyleFunction)
+  oUF:SetActiveStyle('MyLayout')
+  
+  oUF:Spawn('player'):SetPoint('CENTER', -220, -150)
+  oUF:Spawn('target'):SetPoint('CENTER', 220, -150)
+end)
+```
+
+---
+
+### EnableFactory
+
+Enables the factory, allowing queued functions to execute.
+
+```lua
+oUF:EnableFactory()
+```
+
+<Note>
+  The factory is enabled by default. You only need to call this if you previously disabled it.
+</Note>
+
+**Example:**
+
+```lua
+-- Re-enable after disabling
+oUF:EnableFactory()
+```
+
+---
+
+### DisableFactory
+
+Disables the factory, preventing queued functions from executing.
+
+```lua
+oUF:DisableFactory()
+```
+
+<Warning>
+  Disabling the factory will prevent all queued functions from running, even after `PLAYER_LOGIN`. Only use this if you're managing initialization yourself.
+</Warning>
+
+**Example:**
+
+```lua
+-- Disable factory for custom initialization
+oUF:DisableFactory()
+
+-- Later, manually spawn frames
+MyAddon:InitializeFrames()
+```
+
+---
+
+### RunFactoryQueue
+
+Manually processes the queue of functions waiting for execution.
+
+```lua
+oUF:RunFactoryQueue()
+```
+
+<Note>
+  This only works if the player is logged in and the factory is active. The queue is automatically cleared after processing to prevent duplicates.
+</Note>
+
+**Example:**
+
+```lua
+-- Force early execution of queued functions
+if IsLoggedIn() then
+  oUF:RunFactoryQueue()
+end
+```
+
+---
+
+## How It Works
+
+The factory system provides a safe way to delay frame creation until all game data is available:
+
+1. **Addon loads** during `ADDON_LOADED`
+2. **Layout code calls** `oUF:Factory(func)` 
+3. **Function is queued** (player not yet logged in)
+4. **`PLAYER_LOGIN` fires** when character enters world
+5. **Factory processes queue**, executing all functions in order
+6. **Frames are spawned** with full access to game data
+
+<Note>
+  If you call `:Factory()` after `PLAYER_LOGIN` has already fired, the function executes immediately.
+</Note>
+
+---
+
+## Usage Examples
+
+### Basic Layout Initialization
+
+```lua
+-- MyLayout.lua
+local addonName, ns = ...
+
+-- Get oUF reference
+local oUF = ns.oUF or oUF
+
+-- Define your style
+local function MyStyle(frame, unit)
+  frame:SetSize(200, 50)
+  
+  local Health = CreateFrame('StatusBar', nil, frame)
+  Health:SetAllPoints()
+  Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Health.colorHealth = true
+  frame.Health = Health
+end
+
+-- Use Factory to ensure everything is ready
+oUF:Factory(function(oUF)
+  oUF:RegisterStyle('MyLayout', MyStyle)
+  oUF:SetActiveStyle('MyLayout')
+  
+  -- Spawn frames
+  local player = oUF:Spawn('player', 'MyLayoutPlayer')
+  player:SetPoint('CENTER', UIParent, 'CENTER', -250, -200)
+  
+  local target = oUF:Spawn('target', 'MyLayoutTarget')
+  target:SetPoint('CENTER', UIParent, 'CENTER', 250, -200)
+end)
+```
+
+---
+
+### Multiple Factory Calls
+
+```lua
+-- You can call Factory multiple times
+-- Functions execute in the order they were queued
+
+-- Register styles early
+oUF:Factory(function(oUF)
+  oUF:RegisterStyle('MyLayout', MyStyleFunction)
+  oUF:SetActiveStyle('MyLayout')
+end)
+
+-- Spawn player/target frames
+oUF:Factory(function(oUF)
+  oUF:Spawn('player'):SetPoint('CENTER', -220, -150)
+  oUF:Spawn('target'):SetPoint('CENTER', 220, -150)
+end)
+
+-- Spawn party frames later
+oUF:Factory(function(oUF)
+  local party = oUF:SpawnHeader(
+    nil, nil,
+    'showParty', true,
+    'yOffset', -5
+  )
+  party:SetPoint('LEFT', UIParent, 'LEFT', 20, 0)
+end)
+```
+
+---
+
+### Conditional Factory Usage
+
+```lua
+local addonName, ns = ...
+local oUF = ns.oUF or oUF
+
+-- Check if we're already logged in
+if IsLoggedIn() then
+  -- Execute immediately
+  MyAddon:InitializeFrames(oUF)
+else
+  -- Queue for later
+  oUF:Factory(function(oUF)
+    MyAddon:InitializeFrames(oUF)
+  end)
+end
+```
+
+---
+
+### Custom Factory Control
+
+```lua
+-- Disable automatic factory processing
+oUF:DisableFactory()
+
+-- Set up custom initialization
+local initFrame = CreateFrame('Frame')
+initFrame:RegisterEvent('PLAYER_ENTERING_WORLD')
+initFrame:SetScript('OnEvent', function(self, event)
+  if event == 'PLAYER_ENTERING_WORLD' then
+    self:UnregisterEvent('PLAYER_ENTERING_WORLD')
+    
+    -- Wait for loading screen to end
+    C_Timer.After(0.5, function()
+      -- Re-enable and process queue
+      oUF:EnableFactory()
+      oUF:RunFactoryQueue()
+    end)
+  end
+end)
+
+-- Queue frames as normal
+oUF:Factory(function(oUF)
+  -- Your initialization code
+end)
+```
+
+---
+
+### Integration with Saved Variables
+
+```lua
+local addonName, ns = ...
+local oUF = ns.oUF or oUF
+
+-- Saved variables aren't available until ADDON_LOADED
+local frame = CreateFrame('Frame')
+frame:RegisterEvent('ADDON_LOADED')
+frame:SetScript('OnEvent', function(self, event, addon)
+  if addon == addonName then
+    self:UnregisterEvent('ADDON_LOADED')
+    
+    -- Initialize saved variables
+    MyLayoutDB = MyLayoutDB or {
+      showPlayer = true,
+      showTarget = true,
+      showParty = true,
+    }
+    
+    -- Now use Factory to spawn frames
+    oUF:Factory(function(oUF)
+      oUF:RegisterStyle('MyLayout', MyStyleFunction)
+      oUF:SetActiveStyle('MyLayout')
+      
+      if MyLayoutDB.showPlayer then
+        oUF:Spawn('player'):SetPoint('CENTER', -220, -150)
+      end
+      
+      if MyLayoutDB.showTarget then
+        oUF:Spawn('target'):SetPoint('CENTER', 220, -150)
+      end
+      
+      if MyLayoutDB.showParty then
+        local party = oUF:SpawnHeader(nil, nil,
+          'showParty', true,
+          'yOffset', -5
+        )
+        party:SetPoint('LEFT', 20, 0)
+      end
+    end)
+  end
+end)
+```
+
+---
+
+## When to Use Factory
+
+### ✅ Recommended Use Cases
+
+- **Standard layouts** - Most layouts should use Factory for initialization
+- **Accessing unit data** - When you need `UnitName()`, `UnitClass()`, etc. at spawn time
+- **Saved variables** - When frame positions/settings depend on saved data
+- **Multiple initialization steps** - Break complex setup into multiple Factory calls
+
+### ⚠️ When Not to Use
+
+- **Pre-login setup** - Registering styles and elements can happen before login
+- **Library code** - Libraries embedded in layouts should register elements without Factory
+- **Testing/development** - Use `/reload` with immediate execution for faster iteration
+
+---
+
+## Best Practices
+
+### Keep Factory Functions Focused
+
+```lua
+-- Good: Separate concerns
+oUF:Factory(function(oUF)
+  -- Just register and set style
+  oUF:RegisterStyle('MyLayout', MyStyle)
+  oUF:SetActiveStyle('MyLayout')
+end)
+
+oUF:Factory(function(oUF)
+  -- Just spawn frames
+  SpawnPlayerFrames(oUF)
+end)
+
+-- Avoid: Doing too much in one call
+oUF:Factory(function(oUF)
+  -- Hundreds of lines of setup code
+end)
+```
+
+---
+
+### Error Handling
+
+```lua
+oUF:Factory(function(oUF)
+  local success, err = pcall(function()
+    oUF:RegisterStyle('MyLayout', MyStyle)
+    oUF:SetActiveStyle('MyLayout')
+    -- ... more initialization
+  end)
+  
+  if not success then
+    print('MyLayout initialization failed:', err)
+  end
+end)
+```
+
+---
+
+### Testing Factory Behavior
+
+```lua
+-- Debug: Check if factory is active
+print('Factory active:', oUF.Factory and 'yes' or 'no')
+print('Logged in:', IsLoggedIn())
+
+-- Force immediate execution for testing
+if IsLoggedIn() then
+  -- Call initialization directly
+  MyInitFunction(oUF)
+else
+  -- Use factory normally
+  oUF:Factory(MyInitFunction)
+end
+```

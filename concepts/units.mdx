@@ -1,0 +1,534 @@
+---
+title: Units
+description: Understanding WoW unit types, unit strings, unit attributes, and special cases
+---
+
+## What are Units?
+
+In World of Warcraft, a **unit** is any character, creature, or object that can be targeted or referenced. Units are identified by **unit strings** (also called unit tokens or unit IDs).
+
+```lua
+-- Common unit strings
+'player'      -- You
+'target'      -- Your current target
+'pet'         -- Your pet
+'focus'       -- Your focus target
+'party1'      -- First party member
+'raid5'       -- Fifth raid member
+'boss1'       -- First boss frame
+'nameplate1'  -- First nameplate
+```
+
+## Base Unit Types
+
+### Single Units
+
+Units that represent one specific entity:
+
+| Unit String | Description |
+|-------------|-------------|
+| `player` | The player character |
+| `pet` | The player's pet |
+| `target` | Current target |
+| `targettarget` | Target's target |
+| `focus` | Focus target |
+| `focustarget` | Focus target's target |
+| `mouseover` | Unit under cursor |
+| `vehicle` | Vehicle the player is controlling |
+
+### Indexed Units
+
+Units with numeric indices:
+
+| Pattern | Range | Description |
+|---------|-------|-------------|
+| `party1`-`party4` | 1-4 | Party members (excluding player) |
+| `partypet1`-`partypet4` | 1-4 | Party member pets |
+| `raid1`-`raid40` | 1-40 | Raid members |
+| `raidpet1`-`raidpet40` | 1-40 | Raid member pets |
+| `boss1`-`boss5` | 1-5 | Boss frames |
+| `arena1`-`arena5` | 1-5 | Arena opponents |
+| `arenapet1`-`arenapet5` | 1-5 | Arena opponent pets |
+
+### Compound Units
+
+Units with suffixes:
+
+```lua
+-- Target suffix
+'targettarget'      -- Your target's target
+'focustarget'       -- Your focus's target
+'party1target'      -- Party member 1's target
+'raid5target'       -- Raid member 5's target
+'boss1target'       -- Boss 1's target
+
+-- Pet suffix  
+'partypet2'         -- Party member 2's pet
+'raidpet10'         -- Raid member 10's pet
+'arenapet3'         -- Arena opponent 3's pet
+
+-- Combined
+'party1pettarget'   -- Party member 1's pet's target
+```
+
+## Special Unit Types
+
+### Nameplates
+
+Nameplates use dynamic unit strings:
+
+```lua
+-- Nameplate units are assigned dynamically
+'nameplate1'
+'nameplate2'
+-- ... up to active nameplate count
+
+-- Get nameplate for a unit
+local nameplate = C_NamePlate.GetNamePlateForUnit('target')
+```
+
+<Info>
+Nameplate unit IDs are not stable - they change as nameplates appear/disappear. Use `NAME_PLATE_UNIT_ADDED` and `NAME_PLATE_UNIT_REMOVED` events.
+</Info>
+
+### Arena Preparation
+
+Special units during arena preparation:
+
+```lua
+'arena1prep'
+'arena2prep'
+'arena3prep'
+-- Available before arena match starts
+```
+
+### Main Tank/Assist
+
+Raid role units:
+
+```lua
+'maintank1' -- 'maintank2'
+'mainassist1' -- 'mainassist2'
+```
+
+## Unit Attributes
+
+oUF frames store unit information in secure attributes:
+
+### Core Attributes
+
+```lua
+-- The unit this frame displays
+frame:GetAttribute('unit')  -- 'player', 'target', etc.
+
+-- The real unit (before vehicle transformation)
+frame.realUnit  -- 'player' (even when in vehicle)
+
+-- Modified unit (after vehicle transformation)  
+frame.unit  -- 'vehicle' (when in vehicle, otherwise same as realUnit)
+
+-- Numeric index for indexed units
+frame.id  -- '5' for 'raid5'
+```
+
+### Unit Suffix
+
+For group header frames:
+
+```lua
+-- Suffix added to base unit
+frame:GetAttribute('unitsuffix')  -- 'target', 'pet', etc.
+
+-- Example: party header with target suffix
+-- Creates: party1target, party2target, etc.
+```
+
+### Guessed Unit
+
+For header frames before unit assignment:
+
+```lua
+-- Used during initialization
+frame:GetAttribute('oUF-guessUnit')  -- Best guess of what unit will be
+```
+
+## Unit Transformation
+
+oUF handles special unit transformations automatically:
+
+### Vehicle Switching
+
+When entering a vehicle:
+
+```lua
+-- Before vehicle
+frame.unit = 'player'
+frame.realUnit = nil
+
+-- In vehicle
+frame.unit = 'vehicle'
+frame.realUnit = 'player'
+
+-- After exiting
+frame.unit = 'player'
+frame.realUnit = nil
+```
+
+From `ouf.lua:27-50`:
+
+```lua
+local function updateActiveUnit(self, event)
+    local realUnit, modUnit = SecureButton_GetUnit(self), SecureButton_GetModifiedUnit(self)
+    
+    -- Rewrite special units
+    if realUnit == 'playerpet' then
+        realUnit = 'pet'
+    elseif realUnit == 'playertarget' then
+        realUnit = 'target'
+    end
+    
+    -- Handle vehicle
+    if modUnit == 'pet' and realUnit ~= 'pet' then
+        modUnit = 'vehicle'
+    end
+    
+    if Private.UpdateUnits(self, modUnit, realUnit) then
+        self:UpdateAllElements(event or 'RefreshUnit')
+        return true
+    end
+end
+```
+
+### Unit Rewrites
+
+Some units are rewritten for consistency:
+
+```lua
+-- WoW API returns these
+'playerpet' --> 'pet'
+'playertarget' --> 'target'
+```
+
+## Unit Validation
+
+oUF validates units before use:
+
+```lua
+-- Check if unit exists
+if not unitExists(unit) then return end
+
+-- Validate unit for events
+if validateEventUnit(unit) then
+    self:RegisterUnitEvent('UNIT_HEALTH', unit)
+end
+```
+
+From `events.lua:31-68`:
+
+```lua
+function Private.UpdateUnits(frame, unit, realUnit)
+    if unit == realUnit then
+        realUnit = nil
+    end
+    
+    if frame.unit ~= unit or frame.realUnit ~= realUnit then
+        if frame.unitEvents and validateEventUnit(unit) then
+            for event in next, frame.unitEvents do
+                -- Handle secondary units
+                if not realUnit and secondaryUnits[event] then
+                    realUnit = secondaryUnits[event][unit]
+                end
+                
+                -- Re-register unit event
+                registerUnitEvent(frame, event, unit, realUnit)
+            end
+        end
+        
+        frame.unit = unit
+        frame.realUnit = realUnit
+        frame.id = unit:match('^.-(%d+)')
+        
+        return true
+    end
+end
+```
+
+## Secondary Units
+
+Some events require both primary and secondary units:
+
+```lua
+-- Pet events need both player and pet
+UNIT_ENTERED_VEHICLE  -- (pet, player)
+UNIT_EXITED_VEHICLE   -- (pet, player)
+UNIT_PET              -- (pet, player)
+```
+
+From `events.lua:19-29`:
+
+```lua
+local secondaryUnits = {
+    UNIT_ENTERED_VEHICLE = {
+        pet = 'player',
+    },
+    UNIT_EXITED_VEHICLE = {
+        pet = 'player',  
+    },
+    UNIT_PET = {
+        pet = 'player',
+    },
+}
+```
+
+<Note>
+oUF automatically registers secondary units when needed. You don't need to handle this manually.
+</Note>
+
+## Unit Patterns
+
+### Matching Unit Types
+
+Use Lua patterns to identify unit types:
+
+```lua
+-- Check if party unit
+if unit:match('^party%d?$') then
+    -- Party member
+end
+
+-- Check if raid unit  
+if unit:match('^raid%d+$') then
+    -- Raid member
+end
+
+-- Check if target unit
+if unit:match('%w+target$') then
+    -- Any unit's target
+end
+
+-- Check if pet unit
+if unit:match('pet') then
+    -- Any pet (player pet, party pet, raid pet)
+end
+
+-- Check if boss unit
+if unit:match('^boss%d?$') then
+    -- Boss frame
+end
+
+-- Check if arena unit
+if unit:match('^arena%d?$') then
+    -- Arena opponent
+end
+
+-- Check if nameplate
+if unit:match('^nameplate%d+$') then
+    -- Nameplate
+end
+```
+
+### Extracting Unit Index
+
+```lua
+-- Get numeric index
+local index = unit:match('%d+$')
+-- 'raid15' -> '15'
+-- 'party2' -> '2'
+
+-- Stored automatically in frame.id
+local id = frame.id  -- Already extracted
+```
+
+## Unit Comparison
+
+### Same Unit Check
+
+Check if two unit strings refer to the same entity:
+
+```lua
+if UnitIsUnit('player', 'target') then
+    print('You are targeting yourself')
+end
+
+if UnitIsUnit(frame.unit, 'player') then
+    print('This frame shows the player')
+end
+```
+
+### GUID Comparison
+
+Compare by GUID for group frame updates:
+
+```lua
+-- From ouf.lua:237-244
+local function updateRaid(self, event)
+    local unitGUID = UnitGUID(self.unit)
+    if unitGUID ~= nil and not issecretvalue(unitGUID) and unitGUID ~= self.unitGUID then
+        self.unitGUID = unitGUID
+        self:UpdateAllElements(event)
+    end
+end
+```
+
+## Unit-Specific Features
+
+### Player-Only Elements
+
+Some elements only work for player:
+
+```lua
+local function Enable(self, unit)
+    local element = self.ClassPower
+    if element then
+        -- Only enable for player
+        if not UnitIsUnit(unit, 'player') then
+            return false
+        end
+        
+        -- Setup...
+        return true
+    end
+end
+```
+
+### Group Unit Optimization
+
+Optimize for party/raid:
+
+```lua
+if unit == 'party' or unit == 'raid' then
+    -- Register group-specific events
+    self:RegisterEvent('PARTY_MEMBER_ENABLE', Path)
+    self:RegisterEvent('PARTY_MEMBER_DISABLE', Path)
+    self:RegisterEvent('GROUP_ROSTER_UPDATE', Path)
+end
+```
+
+### Target Units
+
+Handle target-suffix units:
+
+```lua
+-- From ouf.lua:275-314
+if not objectUnit:match('%w+target') then
+    -- Not a target unit, register vehicle events
+    object:RegisterEvent('UNIT_ENTERED_VEHICLE', evalUnitAndUpdate)
+    object:RegisterEvent('UNIT_EXITED_VEHICLE', evalUnitAndUpdate)
+else
+    -- Target units are eventless
+    oUF:HandleEventlessUnit(object)
+end
+```
+
+<Info>
+Target-suffix units (e.g., `targettarget`, `party1target`) are "eventless" - they update via polling instead of events.
+</Info>
+
+## Practical Examples
+
+### Unit-Specific Styling
+
+```lua
+oUF:RegisterStyle('MyLayout', function(self, unit)
+    -- Different sizes per unit type
+    if unit == 'player' or unit == 'target' then
+        self:SetSize(300, 80)
+    elseif unit:match('^party%d?$') then
+        self:SetSize(200, 50)
+    elseif unit:match('^raid%d+$') then
+        self:SetSize(100, 30)
+    elseif unit:match('^boss%d?$') then
+        self:SetSize(250, 60)
+    elseif unit:match('^nameplate') then
+        self:SetSize(120, 20)
+    end
+    
+    -- Add elements...
+end)
+```
+
+### Conditional Elements
+
+```lua
+-- Only show cast bar for certain units
+if unit == 'player' or unit == 'target' or unit:match('^boss%d?$') then
+    local Castbar = CreateFrame('StatusBar', nil, self)
+    Castbar:SetSize(250, 20)
+    Castbar:SetPoint('BOTTOM', self, 'TOP', 0, 5)
+    self.Castbar = Castbar
+end
+
+-- Only show debuffs on targets
+if unit:match('target$') then
+    local Debuffs = CreateFrame('Frame', nil, self)
+    Debuffs:SetSize(200, 30)
+    self.Debuffs = Debuffs
+end
+```
+
+### Unit Grouping
+
+```lua
+-- Group similar units
+local function IsGroupUnit(unit)
+    return unit:match('^party%d?$') or unit:match('^raid%d+$')
+end
+
+if IsGroupUnit(unit) then
+    -- Compact layout for groups
+    self:SetSize(150, 30)
+    
+    -- Show role icon
+    local RoleIcon = self:CreateTexture(nil, 'OVERLAY')
+    RoleIcon:SetSize(16, 16)
+    self.GroupRoleIndicator = RoleIcon
+end
+```
+
+## Unit Best Practices
+
+<Tip>
+**Unit Handling**
+- Always validate units before API calls
+- Use `UnitIsUnit()` for comparisons
+- Match patterns for unit type detection
+- Handle vehicle transformation
+- Check for unit existence
+
+**Event Registration**
+- Use unit events for unit-specific data
+- Register both primary and secondary units when needed
+- Handle eventless target units
+- Re-register when unit changes
+
+**Performance**
+- Cache unit type checks
+- Use frame.id instead of parsing
+- Avoid unnecessary UnitGUID calls
+- Group similar unit handling
+</Tip>
+
+## Common Pitfalls
+
+<Warning>
+**Don't:**
+- Assume unit strings are stable (especially nameplates)
+- Compare unit strings directly (use `UnitIsUnit()`)
+- Forget to handle vehicle transitions
+- Register unit events without validation
+- Hardcode unit indices
+
+**Do:**
+- Use WoW API for unit comparisons
+- Handle nil/invalid units gracefully
+- Validate units before event registration
+- Use patterns for unit type detection
+- Test with all relevant unit types
+</Warning>
+
+## Next Steps
+
+- Learn about [Events](/concepts/events) for unit update triggers
+- Explore [Elements](/concepts/elements) for unit data display
+- Check [Architecture](/concepts/architecture) for frame lifecycle
+- Read [Layout Creation](/guides/creating-layout) for practical examples

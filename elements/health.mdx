@@ -1,0 +1,307 @@
+---
+title: 'Health Element'
+description: 'Display and update unit health bars with prediction support'
+---
+
+## Overview
+
+The Health element displays a status bar representing the unit's current and maximum health. It supports advanced features like healing prediction, damage absorbs, temporary health loss, and flexible coloring options.
+
+## Basic Usage
+
+```lua
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetHeight(20)
+Health:SetPoint('TOP')
+Health:SetPoint('LEFT')
+Health:SetPoint('RIGHT')
+
+-- Configure coloring
+Health.colorTapping = true
+Health.colorDisconnected = true
+Health.colorClass = true
+Health.colorReaction = true
+Health.colorHealth = true
+
+-- Register with oUF
+self.Health = Health
+```
+
+## Widget
+
+<ParamField path="Health" type="StatusBar" required>
+  A StatusBar widget used to represent the unit's health. A default texture will be applied if one is not set.
+</ParamField>
+
+## Sub-Widgets
+
+The Health element supports several optional sub-widgets for advanced health visualization:
+
+<ParamField path="Health.TempLoss" type="StatusBar">
+  Represents temporary maximum health reduction (e.g., from certain boss abilities)
+</ParamField>
+
+<ParamField path="Health.HealingAll" type="StatusBar">
+  Shows incoming heals from all sources
+</ParamField>
+
+<ParamField path="Health.HealingPlayer" type="StatusBar">
+  Shows incoming heals from the player only
+</ParamField>
+
+<ParamField path="Health.HealingOther" type="StatusBar">
+  Shows incoming heals from other players
+</ParamField>
+
+<ParamField path="Health.OverHealIndicator" type="Texture">
+  Indicates that incoming healing exceeds configured limits
+</ParamField>
+
+<ParamField path="Health.DamageAbsorb" type="StatusBar">
+  Shows damage absorption shields (e.g., Power Word: Shield)
+</ParamField>
+
+<ParamField path="Health.OverDamageAbsorbIndicator" type="Texture">
+  Indicates that damage absorb amount exceeds configured limits
+</ParamField>
+
+<ParamField path="Health.HealAbsorb" type="StatusBar">
+  Shows heal absorption effects that prevent healing
+</ParamField>
+
+<ParamField path="Health.OverHealAbsorbIndicator" type="Texture">
+  Indicates that heal absorb amount exceeds configured limits
+</ParamField>
+
+## Coloring Options
+
+The Health element uses priority-based coloring. The first matching option determines the color:
+
+<ParamField path="Health.colorDisconnected" type="boolean">
+  Use `self.colors.disconnected` if the unit is offline
+</ParamField>
+
+<ParamField path="Health.colorTapping" type="boolean">
+  Use `self.colors.tapped` if the unit is tapped by another player
+</ParamField>
+
+<ParamField path="Health.colorThreat" type="boolean">
+  Use `self.colors.threat[status]` based on threat status from [UnitThreatSituation](https://warcraft.wiki.gg/wiki/API_UnitThreatSituation)
+</ParamField>
+
+<ParamField path="Health.colorClass" type="boolean">
+  Use `self.colors.class[class]` for player units
+</ParamField>
+
+<ParamField path="Health.colorClassNPC" type="boolean">
+  Use `self.colors.class[class]` for NPC units
+</ParamField>
+
+<ParamField path="Health.colorClassPet" type="boolean">
+  Use `self.colors.class[class]` for player-controlled non-player units
+</ParamField>
+
+<ParamField path="Health.colorSelection" type="boolean">
+  Use `self.colors.selection[type]` based on the unit's outline/highlight color
+</ParamField>
+
+<ParamField path="Health.considerSelectionInCombatHostile" type="boolean">
+  Consider selection as hostile while the unit is in combat with the player
+</ParamField>
+
+<ParamField path="Health.colorReaction" type="boolean">
+  Use `self.colors.reaction[reaction]` based on player reaction from [UnitReaction](https://warcraft.wiki.gg/wiki/API_UnitReaction)
+</ParamField>
+
+<ParamField path="Health.colorSmooth" type="boolean">
+  Use a smooth gradient from `self.colors.health` color curve based on current health percentage
+</ParamField>
+
+<ParamField path="Health.colorHealth" type="boolean">
+  Use `self.colors.health` as the default color
+</ParamField>
+
+## Additional Options
+
+<ParamField path="Health.smoothing" type="number">
+  Status bar smoothing method. Defaults to `Enum.StatusBarInterpolation.Immediate`.
+  Use `Enum.StatusBarInterpolation.Smooth` for smooth animations.
+</ParamField>
+
+<ParamField path="Health.maximumHealthClampMode" type="number">
+  Defines how maximum health should clamp. See [Enum.UnitMaximumHealthMode](https://warcraft.wiki.gg/wiki/Enum.UnitMaximumHealthMode)
+</ParamField>
+
+<ParamField path="Health.damageAbsorbClampMode" type="number">
+  Defines how damage absorbs should clamp. See [Enum.UnitDamageAbsorbClampMode](https://warcraft.wiki.gg/wiki/Enum.UnitDamageAbsorbClampMode)
+</ParamField>
+
+<ParamField path="Health.healAbsorbClampMode" type="number">
+  Defines how heal absorbs should clamp. See [Enum.UnitHealAbsorbClampMode](https://warcraft.wiki.gg/wiki/Enum.UnitHealAbsorbClampMode)
+</ParamField>
+
+<ParamField path="Health.healAbsorbMode" type="number">
+  Defines how heal absorbs should be treated. See [Enum.UnitHealAbsorbMode](https://warcraft.wiki.gg/wiki/Enum.UnitHealAbsorbMode)
+</ParamField>
+
+<ParamField path="Health.incomingHealClampMode" type="number">
+  Defines how incoming healing should clamp. See [Enum.UnitIncomingHealClampMode](https://warcraft.wiki.gg/wiki/Enum.UnitIncomingHealClampMode)
+</ParamField>
+
+<ParamField path="Health.incomingHealOverflow" type="number">
+  Maximum overflow past the end of the health bar (1.0 = no overflow, 1.05 = 5% overflow). Defaults to 1.05
+</ParamField>
+
+## Callbacks
+
+<ParamField path="Health:PreUpdate" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called before the element has been updated.
+  - `self` - the Health element
+  - `unit` - the unit being updated
+</ParamField>
+
+<ParamField path="Health:PostUpdate" type="function">
+  ```lua
+  function(self, unit, cur, max, lossPerc)
+  ```
+  Called after the element has been updated.
+  - `self` - the Health element
+  - `unit` - the unit being updated
+  - `cur` - current health value
+  - `max` - maximum health value
+  - `lossPerc` - percentage of temporary max health reduction
+</ParamField>
+
+<ParamField path="Health:PostUpdateColor" type="function">
+  ```lua
+  function(self, unit, color)
+  ```
+  Called after the element color has been updated.
+  - `self` - the Health element
+  - `unit` - the unit being updated
+  - `color` - the ColorMixin object used
+</ParamField>
+
+## Overrides
+
+<ParamField path="Health.Override" type="function">
+  ```lua
+  function(self, event, unit)
+  ```
+  Completely override the internal update function.
+</ParamField>
+
+<ParamField path="Health.UpdateColor" type="function">
+  ```lua
+  function(self, event, unit)
+  ```
+  Completely override the color update function.
+</ParamField>
+
+## Example with Sub-Widgets
+
+```lua
+-- Create the main health bar
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetPoint('TOPLEFT', self, 'TOPLEFT', 2, -2)
+Health:SetPoint('TOPRIGHT', self, 'TOPRIGHT', -2, -2)
+Health:SetHeight(20)
+
+-- Configure coloring options
+Health.colorTapping = true
+Health.colorDisconnected = true
+Health.colorClass = true
+Health.colorReaction = true
+Health.colorHealth = true
+
+-- Enable smooth animations
+Health.smoothing = Enum.StatusBarInterpolation.Smooth
+
+-- Add incoming heals visualization
+local HealingAll = CreateFrame('StatusBar', nil, Health)
+HealingAll:SetPoint('TOP')
+HealingAll:SetPoint('BOTTOM')
+HealingAll:SetPoint('LEFT', Health:GetStatusBarTexture(), 'RIGHT')
+HealingAll:SetWidth(200)
+HealingAll:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+HealingAll:SetStatusBarColor(0, 1, 0, 0.5) -- Green, semi-transparent
+Health.HealingAll = HealingAll
+
+-- Add damage absorb visualization
+local DamageAbsorb = CreateFrame('StatusBar', nil, Health)
+DamageAbsorb:SetPoint('TOP')
+DamageAbsorb:SetPoint('BOTTOM')
+DamageAbsorb:SetPoint('LEFT', HealingAll:GetStatusBarTexture(), 'RIGHT')
+DamageAbsorb:SetWidth(200)
+DamageAbsorb:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+DamageAbsorb:SetStatusBarColor(1, 1, 0, 0.5) -- Yellow, semi-transparent
+Health.DamageAbsorb = DamageAbsorb
+
+-- Add heal absorb visualization
+local HealAbsorb = CreateFrame('StatusBar', nil, Health)
+HealAbsorb:SetPoint('TOP')
+HealAbsorb:SetPoint('BOTTOM')
+HealAbsorb:SetPoint('RIGHT', Health:GetStatusBarTexture())
+HealAbsorb:SetWidth(200)
+HealAbsorb:SetReverseFill(true)
+HealAbsorb:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+HealAbsorb:SetStatusBarColor(1, 0, 1, 0.5) -- Purple, semi-transparent
+Health.HealAbsorb = HealAbsorb
+
+-- Register with oUF
+self.Health = Health
+```
+
+## Example with Callbacks
+
+```lua
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetHeight(20)
+Health:SetPoint('TOP', 0, 0)
+
+Health.colorHealth = true
+Health.colorClass = true
+
+-- Add a background
+local bg = Health:CreateTexture(nil, 'BACKGROUND')
+bg:SetAllPoints()
+bg:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+bg.multiplier = 0.3
+Health.bg = bg
+
+-- Custom update logic
+Health.PostUpdate = function(self, unit, cur, max)
+    -- Update background color to match bar color
+    local r, g, b = self:GetStatusBarColor()
+    self.bg:SetVertexColor(r * self.bg.multiplier, g * self.bg.multiplier, b * self.bg.multiplier)
+    
+    -- Show percentage text
+    if not self.value then
+        self.value = self:CreateFontString(nil, 'OVERLAY')
+        self.value:SetPoint('CENTER')
+        self.value:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+    end
+    
+    local percent = math.floor((cur / max) * 100)
+    self.value:SetFormattedText('%d%%', percent)
+end
+
+self.Health = Health
+```
+
+## Notes
+
+<Note>
+  The Health element uses a [UnitHealPredictionCalculator](https://warcraft.wiki.gg/wiki/API_CreateUnitHealPredictionCalculator) to compute values. This calculator is accessible via `Health.values` and provides methods for querying health, heals, and absorbs.
+</Note>
+
+<Tip>
+  When using sub-widgets like HealingAll or DamageAbsorb, position them relative to the main health bar's status bar texture using `:GetStatusBarTexture()` for proper alignment as the bar fills/empties.
+</Tip>
+
+<Warning>
+  The `element.cur` and `element.max` attributes are deprecated. Use `element.values:GetCurrentHealth()` and `element.values:GetMaximumHealth()` instead.
+</Warning>

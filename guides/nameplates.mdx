@@ -1,0 +1,502 @@
+---
+title: Nameplate Frames
+description: Creating custom nameplate frames with SpawnNamePlates
+---
+
+Nameplates are special frames that appear above characters and NPCs. This guide covers how to create and customize them with oUF.
+
+## Understanding Nameplates
+
+Nameplates differ from regular unit frames:
+
+- **Dynamic**: Created and destroyed as units enter/leave view
+- **Recycled**: Frames are reused for different units
+- **No fixed unit**: The same frame can represent different units over time
+- **Limited API**: Some unit functions don't work on nameplate units
+
+<Warning>
+Nameplate frames are fundamentally different from player/target frames. Don't assume APIs that work for `player` will work for `nameplate1`.
+</Warning>
+
+## Basic Nameplate Setup
+
+```lua
+local addon, ns = ...
+local oUF = ns.oUF
+
+-- Style function for nameplates
+local function StyleNameplate(self, unit)
+  self:SetSize(120, 30)
+  
+  -- Health bar
+  local Health = CreateFrame('StatusBar', nil, self)
+  Health:SetAllPoints()
+  Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Health.colorClass = true
+  Health.colorReaction = true
+  self.Health = Health
+  
+  -- Name text
+  local Name = Health:CreateFontString(nil, 'OVERLAY')
+  Name:SetPoint('CENTER')
+  Name:SetFont('Fonts\\FRIZQT__.TTF', 10, 'OUTLINE')
+  self:Tag(Name, '[name]')
+end
+
+-- Register the style
+oUF:RegisterStyle('MyNameplates', StyleNameplate)
+
+-- Spawn nameplates
+oUF:Factory(function(oUF)
+  oUF:SetActiveStyle('MyNameplates')
+  
+  local nameplates = oUF:SpawnNamePlates('oUF_MyNameplates')
+  
+  -- Configure nameplate behavior
+  nameplates:SetSize(120, 30)
+end)
+```
+
+## SpawnNamePlates
+
+The `SpawnNamePlates` function creates a nameplate driver:
+
+```lua
+local nameplates = oUF:SpawnNamePlates([prefix])
+```
+
+**Parameters:**
+- `prefix` (string, optional): Prefix for nameplate frame names
+
+**Returns:**
+- A nameplate driver object with special methods
+
+<Note>
+Unlike `Spawn()`, `SpawnNamePlates()` doesn't create frames immediately. Frames are created dynamically as nameplates appear.
+</Note>
+
+## Nameplate Driver Methods
+
+The driver returned by `SpawnNamePlates` has several methods:
+
+### SetSize
+
+Set the size for all nameplates:
+
+```lua
+local nameplates = oUF:SpawnNamePlates()
+nameplates:SetSize(120, 30)  -- width, height
+```
+
+### SetAddedCallback
+
+Called when a nameplate is added:
+
+```lua
+nameplates:SetAddedCallback(function(nameplate, event, unit)
+  -- nameplate: the oUF frame
+  -- event: 'NAME_PLATE_UNIT_ADDED'
+  -- unit: the nameplate unit (e.g., 'nameplate1')
+  
+  print('Nameplate added for', UnitName(unit))
+end)
+```
+
+### SetRemovedCallback
+
+Called when a nameplate is removed:
+
+```lua
+nameplates:SetRemovedCallback(function(nameplate, event, unit)
+  print('Nameplate removed for', unit)
+  
+  -- Clean up any custom timers or state
+  if nameplate.myTimer then
+    nameplate.myTimer:Cancel()
+  end
+end)
+```
+
+### SetTargetCallback
+
+Called when you target a unit with a nameplate:
+
+```lua
+nameplates:SetTargetCallback(function(nameplate, event, unit)
+  -- Highlight the targeted nameplate
+  nameplate:SetScale(1.2)
+  
+  -- Reset other nameplates
+  for _, np in pairs(C_NamePlate.GetNamePlates()) do
+    if np.unitFrame and np.unitFrame ~= nameplate then
+      np.unitFrame:SetScale(1.0)
+    end
+  end
+end)
+```
+
+### SetEnemyInteractible / SetFriendlyInteractible
+
+Control whether nameplates can be clicked:
+
+```lua
+-- Make enemy nameplates non-clickable
+nameplates:SetEnemyInteractible(false)
+
+-- Make friendly nameplates clickable
+nameplates:SetFriendlyInteractible(true)
+```
+
+### SetCVars
+
+Set console variables for nameplate behavior:
+
+```lua
+nameplates:SetCVars({
+  nameplateShowOnlyNames = 0,
+  nameplateShowFriendlyNPCs = 0,
+  nameplateMaxDistance = 60,
+})
+
+-- Or as parameters
+nameplates:SetCVars(
+  'nameplateShowOnlyNames', 0,
+  'nameplateMaxDistance', 60
+)
+```
+
+## Complete Example
+
+```lua
+local addon, ns = ...
+local oUF = ns.oUF
+
+local function StyleNameplate(self, unit)
+  self:SetSize(120, 35)
+  
+  -- Background
+  local bg = self:CreateTexture(nil, 'BACKGROUND')
+  bg:SetAllPoints()
+  bg:SetColorTexture(0, 0, 0, 0.5)
+  
+  -- Health bar
+  local Health = CreateFrame('StatusBar', nil, self)
+  Health:SetPoint('TOPLEFT', 2, -2)
+  Health:SetPoint('TOPRIGHT', -2, -2)
+  Health:SetHeight(20)
+  Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Health.colorThreat = true
+  Health.colorReaction = true
+  Health.colorClass = true
+  self.Health = Health
+  
+  -- Health background
+  local HealthBG = Health:CreateTexture(nil, 'BACKGROUND')
+  HealthBG:SetAllPoints()
+  HealthBG:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  HealthBG:SetVertexColor(0.2, 0.2, 0.2)
+  Health.bg = HealthBG
+  
+  -- Name
+  local Name = Health:CreateFontString(nil, 'OVERLAY')
+  Name:SetPoint('BOTTOMLEFT', Health, 'TOPLEFT', 0, 2)
+  Name:SetFont('Fonts\\FRIZQT__.TTF', 10, 'OUTLINE')
+  Name:SetJustifyH('LEFT')
+  self:Tag(Name, '[name]')
+  
+  -- Health value
+  local HealthValue = Health:CreateFontString(nil, 'OVERLAY')
+  HealthValue:SetPoint('CENTER', Health)
+  HealthValue:SetFont('Fonts\\FRIZQT__.TTF', 9, 'OUTLINE')
+  self:Tag(HealthValue, '[perhp]%')
+  
+  -- Level
+  local Level = Health:CreateFontString(nil, 'OVERLAY')
+  Level:SetPoint('BOTTOMRIGHT', Health, 'TOPRIGHT', 0, 2)
+  Level:SetFont('Fonts\\FRIZQT__.TTF', 9, 'OUTLINE')
+  Level:SetJustifyH('RIGHT')
+  self:Tag(Level, '[difficulty][level]')
+  
+  -- Castbar
+  local Castbar = CreateFrame('StatusBar', nil, self)
+  Castbar:SetPoint('BOTTOMLEFT', 2, 2)
+  Castbar:SetPoint('BOTTOMRIGHT', -2, 2)
+  Castbar:SetHeight(8)
+  Castbar:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  Castbar:SetStatusBarColor(1, 0.7, 0)
+  
+  local CastbarBG = Castbar:CreateTexture(nil, 'BACKGROUND')
+  CastbarBG:SetAllPoints()
+  CastbarBG:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+  CastbarBG:SetVertexColor(0.3, 0.3, 0.3)
+  
+  local Shield = Castbar:CreateTexture(nil, 'OVERLAY')
+  Shield:SetSize(14, 14)
+  Shield:SetPoint('RIGHT', Castbar, 'LEFT', -3, 0)
+  Castbar.Shield = Shield
+  
+  self.Castbar = Castbar
+end
+
+oUF:RegisterStyle('MyNameplates', StyleNameplate)
+
+oUF:Factory(function(oUF)
+  oUF:SetActiveStyle('MyNameplates')
+  
+  local nameplates = oUF:SpawnNamePlates('oUF_MyNameplates')
+  
+  -- Set size
+  nameplates:SetSize(120, 35)
+  
+  -- Callbacks
+  nameplates:SetAddedCallback(function(nameplate, event, unit)
+    -- Scale based on type
+    if UnitIsPlayer(unit) then
+      nameplate:SetScale(1.1)
+    else
+      nameplate:SetScale(1.0)
+    end
+  end)
+  
+  nameplates:SetTargetCallback(function(nameplate, event, unit)
+    -- Highlight target
+    if nameplate.Health then
+      nameplate.Health:SetHeight(24)
+    end
+  end)
+  
+  nameplates:SetRemovedCallback(function(nameplate, event, unit)
+    -- Reset modifications
+    if nameplate.Health then
+      nameplate.Health:SetHeight(20)
+    end
+  end)
+  
+  -- Configure CVars
+  nameplates:SetCVars({
+    nameplateShowOnlyNames = 0,
+    nameplateShowFriendlyNPCs = 0,
+    nameplateMaxDistance = 60,
+    nameplateSelectedScale = 1,
+  })
+  
+  -- Make enemy nameplates non-interactive
+  nameplates:SetEnemyInteractible(false)
+end)
+```
+
+## Unit-Specific Styling
+
+Style nameplates differently based on the unit:
+
+```lua
+local function StyleNameplate(self, unit)
+  self:SetSize(120, 30)
+  
+  -- Common elements
+  local Health = CreateFrame('StatusBar', nil, self)
+  Health:SetAllPoints()
+  self.Health = Health
+  
+  -- PostUpdate callback to customize per unit
+  Health.PostUpdate = function(self, unit)
+    local _, class = UnitClass(unit)
+    
+    if UnitIsPlayer(unit) then
+      -- Player nameplates are larger
+      self.__owner:SetSize(140, 35)
+      
+      -- Show class icon
+      if not self.__owner.ClassIcon then
+        local icon = self.__owner:CreateTexture(nil, 'OVERLAY')
+        icon:SetSize(20, 20)
+        icon:SetPoint('RIGHT', self.__owner, 'LEFT', -5, 0)
+        self.__owner.ClassIcon = icon
+      end
+      
+      local coords = CLASS_ICON_TCOORDS[class]
+      if coords then
+        self.__owner.ClassIcon:SetTexture('Interface\\WorldStateFrame\\Icons-Classes')
+        self.__owner.ClassIcon:SetTexCoord(unpack(coords))
+        self.__owner.ClassIcon:Show()
+      end
+    else
+      -- NPCs are smaller
+      self.__owner:SetSize(120, 30)
+      
+      if self.__owner.ClassIcon then
+        self.__owner.ClassIcon:Hide()
+      end
+    end
+  end
+end
+```
+
+## Auras on Nameplates
+
+Show auras on nameplates:
+
+```lua
+local function StyleNameplate(self, unit)
+  -- ... health setup ...
+  
+  -- Buffs
+  local Buffs = CreateFrame('Frame', nil, self)
+  Buffs:SetSize(120, 20)
+  Buffs:SetPoint('BOTTOM', self, 'TOP', 0, 2)
+  Buffs.size = 18
+  Buffs.num = 6
+  Buffs.spacing = 2
+  
+  -- Only show buffs you cast
+  Buffs.onlyShowPlayer = true
+  
+  self.Buffs = Buffs
+  
+  -- Debuffs
+  local Debuffs = CreateFrame('Frame', nil, self)
+  Debuffs:SetSize(120, 20)
+  Debuffs:SetPoint('TOP', self, 'BOTTOM', 0, -2)
+  Debuffs.size = 18
+  Debuffs.num = 6
+  Debuffs.spacing = 2
+  
+  self.Debuffs = Debuffs
+end
+```
+
+<Tip>
+For nameplates, only show important auras. Use filters to avoid clutter:
+
+```lua
+Buffs.onlyShowPlayer = true
+Debuffs.onlyShowPlayer = true
+```
+</Tip>
+
+## Performance Considerations
+
+Nameplates can impact performance significantly:
+
+<Steps>
+
+### Keep it simple
+
+Avoid complex elements on nameplates:
+
+```lua
+-- Good: Simple, efficient
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetAllPoints()
+self.Health = Health
+
+-- Bad: Too complex for nameplates
+local Health = CreateFrame('StatusBar', nil, self)
+Health.smoothing = true  -- Smoothing on many frames is expensive
+Health.colorSmooth = true  -- Gradient calculations on many frames
+-- Multiple sub-frames, textures, etc.
+```
+
+### Limit auras
+
+```lua
+Buffs.num = 4  -- Show only 4, not 40
+Buffs.onlyShowPlayer = true
+```
+
+### Use CVars wisely
+
+Limit how many nameplates are shown:
+
+```lua
+nameplates:SetCVars({
+  nameplateMaxDistance = 45,  -- Don't show distant nameplates
+  nameplateMinAlpha = 0.5,  -- Fade distant plates
+})
+```
+
+### Avoid OnUpdate
+
+Don't use `OnUpdate` scripts on nameplates - they fire constantly for many frames.
+
+</Steps>
+
+## Common Issues
+
+### Nameplate Not Updating
+
+Nameplates don't always fire the same events as player frames:
+
+```lua
+-- Use UNIT_AURA with proper checking
+local function Update(self, event, unit)
+  -- Nameplates change units, always verify
+  if self.unit ~= unit then return end
+  
+  -- Your update code
+end
+```
+
+### Frames Being Reused
+
+Nameplate frames are recycled. Reset state in callbacks:
+
+```lua
+nameplates:SetRemovedCallback(function(nameplate, event, unit)
+  -- Reset any custom state
+  nameplate.customData = nil
+  
+  if nameplate.myTimer then
+    nameplate.myTimer:Cancel()
+  end
+end)
+```
+
+### Widget Container
+
+oUF preserves Blizzard's widget container (quest icons, etc.):
+
+```lua
+-- Access the widget container if needed
+if self.WidgetContainer then
+  -- Reposition it
+  self.WidgetContainer:ClearAllPoints()
+  self.WidgetContainer:SetPoint('TOP', self, 'BOTTOM', 0, -5)
+end
+```
+
+## Testing Nameplates
+
+<Tip>
+Test nameplates in various scenarios:
+
+1. **Target dummy** - Basic functionality
+2. **City with many players** - Performance with many nameplates
+3. **Raid boss** - Boss nameplates
+4. **Battleground** - Enemy players
+5. **Quest NPCs** - Widget container compatibility
+</Tip>
+
+## Advanced: Personal Nameplate
+
+You can detect and style the personal nameplate (your own) differently:
+
+```lua
+nameplates:SetAddedCallback(function(nameplate, event, unit)
+  if UnitIsUnit(unit, 'player') then
+    -- This is your personal nameplate
+    nameplate:SetScale(1.3)
+    nameplate.isPersonal = true
+  else
+    nameplate:SetScale(1.0)
+    nameplate.isPersonal = false
+  end
+end)
+```
+
+## Next Steps
+
+- Study the [Auras element](/elements/auras) for nameplate auras
+- Learn about [Castbar element](/elements/castbar) for cast bars
+- Explore [Tags](/elements/tags) for dynamic nameplate text
+- Read about [oUF colors](/api/colors) for threat-based coloring

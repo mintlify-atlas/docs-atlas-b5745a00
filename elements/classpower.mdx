@@ -1,0 +1,298 @@
+---
+title: 'ClassPower Element'
+description: 'Display class-specific resources and combo points'
+---
+
+## Overview
+
+The ClassPower element displays class-specific resources such as combo points, chi orbs, holy power, soul shards, and more. It automatically detects the player's class and specialization to show the appropriate resource.
+
+## Basic Usage
+
+```lua
+local ClassPower = {}
+for i = 1, 10 do
+    local bar = CreateFrame('StatusBar', nil, self)
+    bar:SetSize(16, 16)
+    bar:SetPoint('TOPLEFT', self, 'BOTTOMLEFT', (i - 1) * 18, -5)
+    bar:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+    
+    ClassPower[i] = bar
+end
+
+-- Register with oUF
+self.ClassPower = ClassPower
+```
+
+## Widget
+
+<ParamField path="ClassPower" type="table" required>
+  A table containing StatusBar widgets. The number of bars should match the theoretical maximum for your class (usually 10).
+</ParamField>
+
+<Note>
+  The element automatically shows/hides bars based on the active resource's maximum value.
+</Note>
+
+## Supported Classes
+
+The ClassPower element supports the following class resources:
+
+### All Classes
+- **Combo Points** - Available on all classes when in a vehicle or using certain abilities
+
+### Demon Hunter
+- **Soul Fragments** - For Vengeance specialization (counts Dark Heart or Void Metamorphosis stacks)
+
+### Druid
+- **Combo Points** - For Feral specialization (requires Shred ability)
+
+### Evoker
+- **Essence** - All specializations
+
+### Mage
+- **Arcane Charges** - For Arcane specialization
+
+### Monk
+- **Chi Orbs** - For Windwalker specialization
+
+### Paladin
+- **Holy Power** - All specializations
+
+### Rogue
+- **Combo Points** - All specializations
+
+### Shaman
+- **Maelstrom Weapon** - For Enhancement specialization (requires Maelstrom Weapon talent)
+
+### Warlock
+- **Soul Shards** - All specializations
+
+## Callbacks
+
+<ParamField path="ClassPower:PreUpdate" type="function">
+  ```lua
+  function(self, unit)
+  ```
+  Called before the element updates.
+</ParamField>
+
+<ParamField path="ClassPower:PostUpdate" type="function">
+  ```lua
+  function(self, cur, max, hasMaxChanged, powerType, ...)
+  ```
+  Called after the element updates.
+  - `cur` - Current amount of power
+  - `max` - Maximum amount of power
+  - `hasMaxChanged` - True if max has changed since last update
+  - `powerType` - Active power type string
+  - `...` - Indices of charged power points (for combo points)
+</ParamField>
+
+<ParamField path="ClassPower:PostUpdateColor" type="function">
+  ```lua
+  function(self, color)
+  ```
+  Called after the element color updates.
+  - `color` - ColorMixin object used
+</ParamField>
+
+<ParamField path="ClassPower:PostVisibility" type="function">
+  ```lua
+  function(self, isVisible)
+  ```
+  Called when the element's visibility changes.
+  - `isVisible` - True if element should be visible
+</ParamField>
+
+## Overrides
+
+<ParamField path="ClassPower.Override" type="function">
+  ```lua
+  function(self, event, unit, ...)
+  ```
+  Completely override the update function.
+</ParamField>
+
+<ParamField path="ClassPower.UpdateColor" type="function">
+  ```lua
+  function(self, powerType)
+  ```
+  Override the color update function.
+  - `powerType` - Active power type string
+</ParamField>
+
+<ParamField path="ClassPower.OverrideVisibility" type="function">
+  ```lua
+  function(self, event, ...)
+  ```
+  Override the visibility update function.
+</ParamField>
+
+## Horizontal Layout Example
+
+```lua
+local ClassPower = {}
+for i = 1, 10 do
+    local bar = CreateFrame('StatusBar', nil, self)
+    bar:SetSize(20, 20)
+    bar:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+    
+    if i == 1 then
+        bar:SetPoint('BOTTOMLEFT', self, 'TOPLEFT', 0, 5)
+    else
+        bar:SetPoint('LEFT', ClassPower[i-1], 'RIGHT', 2, 0)
+    end
+    
+    -- Add a background
+    local bg = bar:CreateTexture(nil, 'BACKGROUND')
+    bg:SetAllPoints()
+    bg:SetTexture('Interface\\TargetingFrame\\UI-StatusBar')
+    bg:SetVertexColor(0.3, 0.3, 0.3)
+    bar.bg = bg
+    
+    ClassPower[i] = bar
+end
+
+self.ClassPower = ClassPower
+```
+
+## Vertical Layout Example
+
+```lua
+local ClassPower = {}
+for i = 1, 10 do
+    local bar = CreateFrame('StatusBar', nil, self)
+    bar:SetSize(10, 15)
+    bar:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+    bar:SetOrientation('VERTICAL')
+    
+    if i == 1 then
+        bar:SetPoint('BOTTOMLEFT', self, 'BOTTOMRIGHT', 5, 0)
+    else
+        bar:SetPoint('BOTTOM', ClassPower[i-1], 'TOP', 0, 2)
+    end
+    
+    ClassPower[i] = bar
+end
+
+self.ClassPower = ClassPower
+```
+
+## Custom Textures Example
+
+```lua
+local ClassPower = {}
+for i = 1, 10 do
+    local bar = CreateFrame('StatusBar', nil, self)
+    bar:SetSize(24, 24)
+    bar:SetPoint('TOPLEFT', self, 'BOTTOMLEFT', (i - 1) * 26, -5)
+    
+    -- Use a custom texture
+    bar:SetStatusBarTexture('Interface\\PlayerFrame\\UI-PlayerFrame-DeathKnight-Blood')
+    
+    -- Add border
+    local border = bar:CreateTexture(nil, 'BACKGROUND')
+    border:SetPoint('TOPLEFT', -1, 1)
+    border:SetPoint('BOTTOMRIGHT', 1, -1)
+    border:SetTexture('Interface\\Buttons\\WHITE8x8')
+    border:SetVertexColor(0, 0, 0)
+    
+    ClassPower[i] = bar
+end
+
+self.ClassPower = ClassPower
+```
+
+## With Color Customization
+
+```lua
+local ClassPower = {}
+for i = 1, 10 do
+    local bar = CreateFrame('StatusBar', nil, self)
+    bar:SetSize(18, 18)
+    bar:SetPoint('TOPLEFT', self, 'BOTTOMLEFT', (i - 1) * 20, -5)
+    bar:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+    
+    ClassPower[i] = bar
+end
+
+-- Custom coloring based on power amount
+ClassPower.PostUpdate = function(self, cur, max, hasMaxChanged, powerType)
+    for i = 1, max do
+        local bar = self[i]
+        if i <= cur then
+            -- Active bars: color based on how full
+            if cur == max then
+                bar:SetStatusBarColor(1, 0, 0) -- Red at max
+            elseif cur >= max * 0.5 then
+                bar:SetStatusBarColor(1, 1, 0) -- Yellow at half
+            else
+                bar:SetStatusBarColor(0, 1, 0) -- Green below half
+            end
+        else
+            -- Inactive bars: dim
+            bar:SetStatusBarColor(0.3, 0.3, 0.3)
+        end
+    end
+end
+
+self.ClassPower = ClassPower
+```
+
+## Icon-Based Display
+
+For a more visual approach using textures instead of bars:
+
+```lua
+local ClassPower = {}
+for i = 1, 10 do
+    -- Create a frame to hold the icon
+    local icon = CreateFrame('Frame', nil, self)
+    icon:SetSize(20, 20)
+    icon:SetPoint('TOPLEFT', self, 'BOTTOMLEFT', (i - 1) * 22, -5)
+    
+    -- Create texture for active state
+    local active = icon:CreateTexture(nil, 'ARTWORK')
+    active:SetAllPoints()
+    active:SetTexture('Interface\\ComboFrame\\ComboPoint')
+    active:SetTexCoord(0, 0.375, 0, 1)
+    icon.active = active
+    
+    -- Create texture for inactive state
+    local inactive = icon:CreateTexture(nil, 'BACKGROUND')
+    inactive:SetAllPoints()
+    inactive:SetTexture('Interface\\ComboFrame\\ComboPoint')
+    inactive:SetTexCoord(0.375, 0.75, 0, 1)
+    icon.inactive = inactive
+    
+    -- Treat it like a status bar for the element
+    icon.SetMinMaxValues = function() end
+    icon.SetValue = function(self, val)
+        if val > 0 then
+            self.active:Show()
+            self.inactive:Hide()
+        else
+            self.active:Hide()
+            self.inactive:Show()
+        end
+    end
+    icon.SetStatusBarColor = function() end
+    
+    ClassPower[i] = icon
+end
+
+self.ClassPower = ClassPower
+```
+
+<Note>
+  The ClassPower element only works for the player unit. It will not enable on party or raid frames.
+</Note>
+
+<Tip>
+  The element automatically handles spec changes and will show/hide itself based on whether the current spec has an appropriate resource to display.
+</Tip>
+
+<Warning>
+  Create enough bars to handle the maximum possible (usually 10). The element will hide unused bars automatically but cannot create new ones dynamically.
+</Warning>

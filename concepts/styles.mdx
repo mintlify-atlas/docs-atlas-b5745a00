@@ -1,0 +1,483 @@
+---
+title: Styles
+description: Style registration, active style management, and creating layout functions
+---
+
+## What are Styles?
+
+A **style** in oUF is a function that defines the visual appearance and element configuration of unit frames. Styles are the foundation of oUF layouts, separating presentation logic from the core framework.
+
+```lua
+-- Simple style example
+oUF:RegisterStyle('MyStyle', function(self, unit)
+    self:SetSize(200, 50)
+    
+    -- Create health bar
+    local Health = CreateFrame('StatusBar', nil, self)
+    Health:SetAllPoints()
+    Health.colorHealth = true
+    self.Health = Health
+end)
+```
+
+## Style Registration
+
+### Basic Registration
+
+Use `oUF:RegisterStyle()` to register a style function:
+
+```lua
+oUF:RegisterStyle(name, func)
+```
+
+**Parameters:**
+- `name` (string) - Unique identifier for the style
+- `func` (function) - Style function that configures frames
+
+**Example:**
+
+```lua
+oUF:RegisterStyle('SimpleLayout', function(self, unit, isSingle)
+    -- self: The unit frame being styled
+    -- unit: Unit string (e.g., 'player', 'target', 'raid1')
+    -- isSingle: true if spawned via Spawn(), false if from SpawnHeader()
+    
+    self:SetSize(250, 60)
+    self:SetPoint('CENTER')
+end)
+```
+
+<Info>
+The first registered style automatically becomes the active style if none is set.
+</Info>
+
+### Style Function Parameters
+
+Your style function receives three parameters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `self` | frame | The unit frame being initialized |
+| `unit` | string | The unit identifier ('player', 'target', etc.) |
+| `isSingle` | boolean | `true` for `:Spawn()`, `false` for `:SpawnHeader()` |
+
+```lua
+oUF:RegisterStyle('AdaptiveLayout', function(self, unit, isSingle)
+    if isSingle then
+        -- Larger frames for single units
+        self:SetSize(300, 80)
+    else
+        -- Compact frames for group headers
+        self:SetSize(150, 40)
+    end
+    
+    if unit == 'player' then
+        -- Special configuration for player frame
+        self:SetPoint('TOPLEFT', 50, -50)
+    end
+end)
+```
+
+## Active Style Management
+
+### Setting the Active Style
+
+Only one style can be active at a time:
+
+```lua
+oUF:SetActiveStyle(name)
+```
+
+**Example:**
+
+```lua
+oUF:RegisterStyle('PvELayout', PvEStyleFunc)
+oUF:RegisterStyle('PvPLayout', PvPStyleFunc)
+
+-- Switch based on context
+if InCombatZone() then
+    oUF:SetActiveStyle('PvPLayout')
+else
+    oUF:SetActiveStyle('PvELayout')
+end
+
+-- All subsequent spawns use PvPLayout
+local player = oUF:Spawn('player')
+```
+
+<Warning>
+You must set the active style before calling `:Spawn()` or `:SpawnHeader()`. Frames remember which style was active when they were created.
+</Warning>
+
+### Getting the Active Style
+
+Check which style is currently active:
+
+```lua
+local styleName = oUF:GetActiveStyle()
+print('Active style:', styleName)  -- "PvPLayout"
+```
+
+### Iterating Registered Styles
+
+Loop through all registered styles:
+
+```lua
+for styleName in oUF.IterateStyles() do
+    print('Found style:', styleName)
+end
+```
+
+## Style Scope and Inheritance
+
+### Per-Frame Style Storage
+
+Each frame stores its style name:
+
+```lua
+local player = oUF:Spawn('player')  -- Active style is 'MyLayout'
+print(player.style)  -- "MyLayout"
+
+-- Changing active style doesn't affect existing frames
+oUF:SetActiveStyle('OtherLayout')
+print(player.style)  -- Still "MyLayout"
+```
+
+### Header Style Inheritance
+
+Group headers pass their style to child frames:
+
+```lua
+oUF:SetActiveStyle('RaidLayout')
+local header = oUF:SpawnHeader(
+    nil, nil,
+    'showRaid', true,
+    'yOffset', -5
+)
+
+-- All frames created by this header use 'RaidLayout'
+header.style  -- "RaidLayout"
+```
+
+### Style Override in Headers
+
+Headers can override the active style:
+
+```lua
+local header = oUF:SpawnHeader()
+header.style = 'CustomRaidStyle'  -- Override before frames spawn
+```
+
+## Style Function Patterns
+
+### Shared Function Style
+
+Use a shared function for consistency:
+
+```lua
+local function SharedStyle(self, unit)
+    -- Common configuration
+    self:SetSize(200, 50)
+    self:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        insets = {left = 2, right = 2, top = 2, bottom = 2}
+    })
+    self:SetBackdropColor(0, 0, 0, 0.5)
+    
+    -- Create health bar
+    local Health = CreateFrame('StatusBar', nil, self)
+    Health:SetAllPoints()
+    Health.colorHealth = true
+    self.Health = Health
+end
+
+oUF:RegisterStyle('Style1', SharedStyle)
+oUF:RegisterStyle('Style2', SharedStyle)
+```
+
+### Table-Based Configuration
+
+Combine function with configuration table:
+
+```lua
+local config = {
+    player = { size = {300, 80}, point = {'CENTER', -250, 0} },
+    target = { size = {300, 80}, point = {'CENTER', 250, 0} },
+    party = { size = {150, 40}, point = {'TOPLEFT', 50, -50} },
+}
+
+local function ConfigurableStyle(self, unit)
+    local cfg = config[unit] or config.party
+    
+    self:SetSize(unpack(cfg.size))
+    if cfg.point then
+        self:SetPoint(unpack(cfg.point))
+    end
+    
+    -- Add elements...
+end
+
+oUF:RegisterStyle('ConfigLayout', ConfigurableStyle)
+```
+
+### Unit-Specific Styling
+
+Apply different configurations per unit type:
+
+```lua
+oUF:RegisterStyle('UnitSpecific', function(self, unit)
+    if unit == 'player' then
+        -- Player-specific elements
+        self:SetSize(300, 100)
+        
+        local ClassPower = CreateFrame('Frame', nil, self)
+        ClassPower:SetSize(300, 20)
+        ClassPower:SetPoint('BOTTOM', self, 'TOP', 0, 5)
+        self.ClassPower = ClassPower
+        
+    elseif unit == 'target' then
+        -- Target-specific
+        self:SetSize(300, 80)
+        
+    elseif unit:match('party%d?$') then
+        -- Compact party frames
+        self:SetSize(150, 30)
+        
+    elseif unit:match('nameplate') then
+        -- Minimal nameplate style
+        self:SetSize(120, 12)
+    end
+    
+    -- Common elements for all units
+    local Health = CreateFrame('StatusBar', nil, self)
+    Health:SetAllPoints()
+    self.Health = Health
+end)
+```
+
+## Advanced Patterns
+
+### Modular Style Builders
+
+Create helper functions for reusable components:
+
+```lua
+local function CreateHealthBar(frame, height)
+    local Health = CreateFrame('StatusBar', nil, frame)
+    Health:SetHeight(height)
+    Health:SetPoint('TOPLEFT')
+    Health:SetPoint('TOPRIGHT')
+    Health.colorHealth = true
+    Health.colorClass = true
+    return Health
+end
+
+local function CreatePowerBar(frame, height)
+    local Power = CreateFrame('StatusBar', nil, frame)
+    Power:SetHeight(height)
+    Power:SetPoint('BOTTOMLEFT')
+    Power:SetPoint('BOTTOMRIGHT')
+    Power.colorPower = true
+    return Power
+end
+
+oUF:RegisterStyle('ModularLayout', function(self, unit)
+    self:SetSize(250, 60)
+    
+    self.Health = CreateHealthBar(self, 40)
+    self.Power = CreatePowerBar(self, 15)
+end)
+```
+
+### Multi-Style Layouts
+
+Register multiple related styles:
+
+```lua
+-- Healer-focused style
+oUF:RegisterStyle('MyLayout_Healer', function(self, unit)
+    self:SetSize(200, 60)
+    -- Prominent healing prediction
+    -- Large buff displays
+    -- Minimal damage info
+end)
+
+-- DPS-focused style
+oUF:RegisterStyle('MyLayout_DPS', function(self, unit)
+    self:SetSize(180, 40)
+    -- Prominent threat display
+    -- Debuff tracking
+    -- Resource indicators
+end)
+
+-- Auto-select based on spec
+local spec = GetSpecialization()
+if spec == 1 then  -- Healer
+    oUF:SetActiveStyle('MyLayout_Healer')
+else
+    oUF:SetActiveStyle('MyLayout_DPS')
+end
+```
+
+### Style Mixins
+
+Extend frames with additional methods:
+
+```lua
+local StyleMixin = {
+    UpdateHealthColor = function(self)
+        local r, g, b = UnitSelectionColor(self.unit)
+        self.Health:SetStatusBarColor(r, g, b)
+    end,
+    
+    ShowRole = function(self)
+        local role = UnitGroupRolesAssigned(self.unit)
+        if self.RoleIcon then
+            self.RoleIcon:SetTexture(roleTextures[role])
+        end
+    end
+}
+
+oUF:RegisterStyle('MixinStyle', function(self, unit)
+    -- Add mixin methods
+    for k, v in pairs(StyleMixin) do
+        self[k] = v
+    end
+    
+    self:SetSize(200, 50)
+    -- Create elements...
+end)
+```
+
+## Style Best Practices
+
+<Tip>
+**Organization**
+- Use descriptive style names (e.g., 'MyAddon_Healer' not 'Style1')
+- Group related styles with common prefixes
+- Keep style functions focused and readable
+
+**Configuration**
+- Store settings in external config tables
+- Provide sensible defaults
+- Document unit-specific behaviors
+
+**Reusability**
+- Extract common code into helper functions
+- Use unit parameter for conditional logic
+- Consider isSingle parameter for size scaling
+
+**Performance**
+- Create textures/frames once, not on every update
+- Avoid heavy calculations in style functions
+- Use shared textures when possible
+</Tip>
+
+## Common Pitfalls
+
+<Warning>
+**Don't:**
+- Modify frames after spawning from different styles
+- Register elements inside style functions (use oUF:AddElement)
+- Create anonymous style functions (makes debugging hard)
+- Forget to set active style before spawning
+
+**Do:**
+- Set active style explicitly
+- Keep style pure (frame configuration only)
+- Test with multiple unit types
+- Handle nil units gracefully
+</Warning>
+
+## Complete Example
+
+```lua
+-- Modern oUF layout with multiple styles
+local _, ns = ...
+local oUF = ns.oUF
+
+-- Configuration
+local config = {
+    colors = {
+        backdrop = {0, 0, 0, 0.5},
+        border = {0.3, 0.3, 0.3, 1}
+    },
+    sizes = {
+        player = {300, 80},
+        target = {300, 80},
+        party = {150, 40},
+        raid = {80, 40}
+    }
+}
+
+-- Helper to create styled backdrop
+local function SetupBackdrop(frame)
+    frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = {left = 1, right = 1, top = 1, bottom = 1}
+    })
+    frame:SetBackdropColor(unpack(config.colors.backdrop))
+    frame:SetBackdropBorderColor(unpack(config.colors.border))
+end
+
+-- Main style function
+local function MyLayoutStyle(self, unit, isSingle)
+    -- Determine size
+    local size = config.sizes[unit] or config.sizes.raid
+    self:SetSize(unpack(size))
+    
+    -- Apply backdrop
+    SetupBackdrop(self)
+    
+    -- Health bar
+    local Health = CreateFrame('StatusBar', nil, self)
+    Health:SetHeight(isSingle and 50 or 30)
+    Health:SetPoint('TOPLEFT', 2, -2)
+    Health:SetPoint('TOPRIGHT', -2, -2)
+    Health:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+    Health.colorClass = true
+    Health.colorReaction = true
+    self.Health = Health
+    
+    -- Power bar (single frames only)
+    if isSingle then
+        local Power = CreateFrame('StatusBar', nil, self)
+        Power:SetHeight(15)
+        Power:SetPoint('BOTTOMLEFT', 2, 2)
+        Power:SetPoint('BOTTOMRIGHT', -2, 2)
+        Power:SetStatusBarTexture('Interface\\TargetingFrame\\UI-StatusBar')
+        Power.colorPower = true
+        self.Power = Power
+    end
+end
+
+-- Register style
+oUF:RegisterStyle('MyLayout', MyLayoutStyle)
+
+-- Spawn frames on login
+oUF:Factory(function(self)
+    self:SetActiveStyle('MyLayout')
+    
+    local player = self:Spawn('player')
+    player:SetPoint('CENTER', -300, 0)
+    
+    local target = self:Spawn('target')
+    target:SetPoint('CENTER', 300, 0)
+    
+    local party = self:SpawnHeader(
+        nil, nil,
+        'showParty', true,
+        'yOffset', -5
+    )
+    party:SetPoint('TOPLEFT', 20, -20)
+end)
+```
+
+## Next Steps
+
+- Learn about [Elements](/concepts/elements) to add functionality
+- Explore [Units](/concepts/units) for unit string handling
+- Understand [Events](/concepts/events) for update triggers
+- Check [Layout Creation](/guides/creating-layout) for complete examples

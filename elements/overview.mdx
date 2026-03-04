@@ -1,0 +1,236 @@
+---
+title: 'Elements Overview'
+description: 'Understanding oUF elements and how to use them in your unit frames'
+---
+
+## What are Elements?
+
+Elements are the building blocks of oUF unit frames. Each element represents a specific piece of information or functionality that can be displayed on a unit frame, such as health bars, power bars, auras, cast bars, and various indicators.
+
+## How Elements Work
+
+Elements follow a consistent lifecycle:
+
+1. **Creation** - You create a widget (Frame, StatusBar, Texture, or FontString) and assign it to your unit frame
+2. **Registration** - When the unit frame spawns, oUF automatically detects and enables the element
+3. **Updates** - The element updates automatically in response to game events
+4. **Callbacks** - You can hook into the update process with custom callbacks
+
+## Basic Element Usage
+
+### Simple Element Example
+
+```lua
+local function StyleFunc(self, unit)
+    -- Create a health bar
+    local Health = CreateFrame('StatusBar', nil, self)
+    Health:SetHeight(20)
+    Health:SetPoint('TOP')
+    Health:SetPoint('LEFT')
+    Health:SetPoint('RIGHT')
+    
+    -- Configure options
+    Health.colorHealth = true
+    Health.colorClass = true
+    Health.colorReaction = true
+    
+    -- Register it with oUF
+    self.Health = Health
+end
+```
+
+### Element with Callbacks
+
+```lua
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetHeight(20)
+Health:SetPoint('TOP', 0, 0)
+
+-- Add a callback
+Health.PostUpdate = function(self, unit, cur, max)
+    -- Custom logic after health updates
+    if cur < max * 0.3 then
+        self:SetStatusBarColor(1, 0, 0) -- Red when low
+    end
+end
+
+self.Health = Health
+```
+
+## Common Element Patterns
+
+### Status Bars
+
+Many elements use StatusBar widgets to display values:
+
+- **Health** - Unit's current and maximum health
+- **Power** - Unit's power (mana, energy, rage, etc.)
+- **Castbar** - Spell casting progress
+- **ClassPower** - Class-specific resources (combo points, chi, etc.)
+
+### Textures
+
+Texture elements display icons or indicators:
+
+- **Portrait** - Unit's portrait (2D or 3D)
+- **LeaderIndicator** - Shows if unit is group leader
+- **RaidRoleIndicator** - Shows main tank/assist assignment
+- **PvPIndicator** - Shows PvP status and faction
+
+### FontStrings
+
+Text elements display dynamic information:
+
+- **Tags** - Flexible text display system using tag strings
+
+### Frames
+
+Container elements hold multiple sub-widgets:
+
+- **Auras** - Collection of buff/debuff buttons
+- **Buffs** - Collection of buff buttons
+- **Debuffs** - Collection of debuff buttons
+
+## Element Options
+
+Most elements support configuration options that control their behavior:
+
+```lua
+local Health = CreateFrame('StatusBar', nil, self)
+
+-- Coloring options (priority-based)
+Health.colorDisconnected = true  -- Color when offline
+Health.colorTapping = true       -- Color when tapped
+Health.colorThreat = true        -- Color by threat status
+Health.colorClass = true         -- Color by unit class
+Health.colorReaction = true      -- Color by reaction
+Health.colorHealth = true        -- Default health color
+
+-- Smoothing option
+Health.smoothing = Enum.StatusBarInterpolation.Smooth
+
+self.Health = Health
+```
+
+## Element Callbacks
+
+Elements provide callbacks for customization:
+
+### PreUpdate
+
+Called before the element updates:
+
+```lua
+Health.PreUpdate = function(self, unit)
+    -- Runs before health values are updated
+end
+```
+
+### PostUpdate
+
+Called after the element updates:
+
+```lua
+Health.PostUpdate = function(self, unit, cur, max)
+    -- Runs after health values are updated
+    -- cur = current health, max = maximum health
+end
+```
+
+### Override
+
+Completely replace the update logic:
+
+```lua
+Health.Override = function(self, event, unit)
+    -- Your custom update logic
+    -- Must handle everything yourself
+end
+```
+
+## Element Priority
+
+Some elements (like Health and Power) use priority-based coloring. The first matching condition determines the color:
+
+1. **colorDisconnected** - Unit is offline
+2. **colorTapping** - Unit is tapped by another player
+3. **colorThreat** - Based on threat status
+4. **colorClass** - Based on unit class
+5. **colorReaction** - Based on player reaction
+6. **colorHealth/colorPower** - Default color
+
+## Sub-Widgets
+
+Many elements support sub-widgets for additional functionality:
+
+```lua
+local Health = CreateFrame('StatusBar', nil, self)
+Health:SetPoint('TOPLEFT', self, 'TOPLEFT', 2, -2)
+Health:SetPoint('TOPRIGHT', self, 'TOPRIGHT', -2, -2)
+Health:SetHeight(20)
+
+-- Add incoming heals sub-widget
+local HealingAll = CreateFrame('StatusBar', nil, Health)
+HealingAll:SetPoint('TOP')
+HealingAll:SetPoint('BOTTOM')
+HealingAll:SetPoint('LEFT', Health:GetStatusBarTexture(), 'RIGHT')
+HealingAll:SetWidth(200)
+Health.HealingAll = HealingAll
+
+-- Add damage absorb sub-widget
+local DamageAbsorb = CreateFrame('StatusBar', nil, Health)
+DamageAbsorb:SetPoint('TOP')
+DamageAbsorb:SetPoint('BOTTOM')
+DamageAbsorb:SetPoint('LEFT', HealingAll:GetStatusBarTexture(), 'RIGHT')
+DamageAbsorb:SetWidth(200)
+Health.DamageAbsorb = DamageAbsorb
+
+self.Health = Health
+```
+
+## Available Elements
+
+### Core Elements
+
+- [Health](/elements/health) - Health bars with prediction
+- [Power](/elements/power) - Power/mana bars
+- [Auras](/elements/auras) - Buffs and debuffs
+- [Castbar](/elements/castbar) - Casting bars
+- [ClassPower](/elements/classpower) - Class resources
+- [Portrait](/elements/portrait) - Unit portraits
+- [Tags](/elements/tags) - Dynamic text display
+
+### Indicator Elements
+
+- [LeaderIndicator](/elements/indicators#leader) - Group leader status
+- [RaidRoleIndicator](/elements/indicators#raid-role) - Main tank/assist
+- [PvPIndicator](/elements/indicators#pvp) - PvP and honor status
+- [ReadyCheckIndicator](/elements/indicators#ready-check) - Ready check status
+- And [many more](/elements/indicators)
+
+### Advanced Elements
+
+- AdditionalPower - Alternate power bars
+- AlternativePower - Special encounter power
+- HealthPrediction - Incoming heals visualization
+- PowerPrediction - Power cost prediction
+- Runes - Death Knight runes
+- Stagger - Monk stagger
+- Totems - Shaman totems
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Health Element" icon="heart" href="/elements/health">
+    Learn about the health bar element
+  </Card>
+  <Card title="Power Element" icon="bolt" href="/elements/power">
+    Learn about power and resource bars
+  </Card>
+  <Card title="Auras Element" icon="sparkles" href="/elements/auras">
+    Display buffs and debuffs
+  </Card>
+  <Card title="All Elements" icon="list" href="/elements/all-elements">
+    Complete element reference
+  </Card>
+</CardGroup>

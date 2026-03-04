@@ -1,0 +1,490 @@
+---
+title: Embedding oUF
+description: How to embed oUF directly into your addon
+---
+
+Embedding oUF allows you to include the framework directly in your addon, giving you full control over versioning and distribution.
+
+## Why Embed?
+
+**Advantages:**
+- No external dependencies for users
+- Version control - you choose when to update
+- Guaranteed compatibility
+- Easier distribution
+
+**Disadvantages:**
+- Your addon size increases
+- You're responsible for updates and bug fixes
+- Multiple embedded copies in different addons
+
+<Note>
+Most layout authors choose to embed oUF for better user experience and compatibility.
+</Note>
+
+## Setup
+
+<Steps>
+
+### Download oUF source
+
+Clone or download oUF from the [GitHub repository](https://github.com/oUF-wow/oUF):
+
+```bash
+git clone https://github.com/oUF-wow/oUF.git
+```
+
+Or download the source as a zip file.
+
+### Create addon structure
+
+Organize your addon like this:
+
+```
+MyLayout/
+├── MyLayout.toc
+├── embeds.xml
+├── oUF/
+│   ├── colors.lua
+│   ├── elements/
+│   ├── enums.lua
+│   ├── events.lua
+│   ├── factory.lua
+│   ├── finalize.lua
+│   ├── init.lua
+│   ├── ouf.lua
+│   ├── private.lua
+│   └── units.lua
+├── core.lua
+└── layout.lua
+```
+
+### Configure TOC file
+
+**MyLayout.toc:**
+```
+## Interface: 110002
+## Title: My oUF Layout
+## Notes: Custom unit frames
+## Author: YourName
+## Version: 1.0.0
+
+# Embedded oUF
+embeds.xml
+
+# Your files
+core.lua
+layout.lua
+```
+
+### Create embeds.xml
+
+**embeds.xml:**
+```xml
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+  <Script file="oUF\init.lua"/>
+  <Script file="oUF\private.lua"/>
+  <Script file="oUF\enums.lua"/>
+  <Script file="oUF\events.lua"/>
+  <Script file="oUF\colors.lua"/>
+  <Script file="oUF\ouf.lua"/>
+  <Script file="oUF\units.lua"/>
+  <Script file="oUF\factory.lua"/>
+  <Script file="oUF\blizzard.lua"/>
+  
+  <!-- Elements -->
+  <Script file="oUF\elements\health.lua"/>
+  <Script file="oUF\elements\power.lua"/>
+  <Script file="oUF\elements\castbar.lua"/>
+  <Script file="oUF\elements\auras.lua"/>
+  <Script file="oUF\elements\portrait.lua"/>
+  <Script file="oUF\elements\tags.lua"/>
+  
+  <!-- Add other elements as needed -->
+  
+  <Script file="oUF\finalize.lua"/>
+</Ui>
+```
+
+<Warning>
+The load order is critical. `init.lua` must be first, and `finalize.lua` must be last.
+</Warning>
+
+### Set up core.lua
+
+**core.lua:**
+```lua
+local addon, ns = ...
+
+-- Get the embedded oUF instance
+local oUF = ns.oUF
+
+-- Make it available globally for your addon
+ns.oUF = oUF
+
+-- Optional: Set a custom global name
+-- This prevents conflicts with other oUF versions
+oUF.version = '@project-version@'  -- Replaced during build
+```
+
+### Create your layout
+
+**layout.lua:**
+```lua
+local addon, ns = ...
+local oUF = ns.oUF
+
+-- Your style function
+local function StyleFrame(self, unit)
+  -- Frame styling here
+end
+
+-- Register and spawn
+oUF:RegisterStyle('MyLayout', StyleFrame)
+oUF:Factory(function(oUF)
+  oUF:SetActiveStyle('MyLayout')
+  oUF:Spawn('player'):SetPoint('CENTER', -220, -250)
+  oUF:Spawn('target'):SetPoint('CENTER', 220, -250)
+end)
+```
+
+</Steps>
+
+## Custom Global Name
+
+To avoid conflicts with other oUF installations, use a custom global:
+
+**MyLayout.toc:**
+```
+## Interface: 110002
+## Title: My oUF Layout
+## X-oUF: oUF_MyLayout
+
+embeds.xml
+core.lua
+layout.lua
+```
+
+This sets `_G.oUF_MyLayout` instead of `_G.oUF`.
+
+Access it in your code:
+
+```lua
+-- In init.lua, oUF reads X-oUF from the TOC
+local addon, ns = ...
+local oUF = oUF_MyLayout  -- Your custom global
+```
+
+<Note>
+The `X-oUF` field in the TOC tells oUF what global name to use. If not specified, it defaults to `oUF`.
+</Note>
+
+## Selecting Elements
+
+You don't need all elements. Include only what you use:
+
+**embeds.xml (minimal):**
+```xml
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+  <!-- Core (required) -->
+  <Script file="oUF\init.lua"/>
+  <Script file="oUF\private.lua"/>
+  <Script file="oUF\enums.lua"/>
+  <Script file="oUF\events.lua"/>
+  <Script file="oUF\colors.lua"/>
+  <Script file="oUF\ouf.lua"/>
+  <Script file="oUF\units.lua"/>
+  <Script file="oUF\factory.lua"/>
+  <Script file="oUF\blizzard.lua"/>
+  
+  <!-- Only the elements you need -->
+  <Script file="oUF\elements\health.lua"/>
+  <Script file="oUF\elements\power.lua"/>
+  <Script file="oUF\elements\tags.lua"/>
+  
+  <Script file="oUF\finalize.lua"/>
+</Ui>
+```
+
+<Tip>
+Removing unused elements reduces your addon's file size and memory footprint.
+</Tip>
+
+## Updating oUF
+
+When updating your embedded oUF:
+
+<Steps>
+
+### Backup your current version
+
+```bash
+cp -r oUF oUF.backup
+```
+
+### Download new version
+
+Get the latest release from GitHub.
+
+### Replace files
+
+```bash
+rm -rf oUF
+cp -r /path/to/new/oUF ./
+```
+
+### Test thoroughly
+
+Test all features of your layout with the new version.
+
+### Update version number
+
+Update your addon's version to reflect the oUF update.
+
+</Steps>
+
+<Warning>
+Always test oUF updates thoroughly before releasing. API changes may break your layout.
+</Warning>
+
+## Package Management
+
+### Using BigWigsMods Packager
+
+The [BigWigsMods packager](https://github.com/BigWigsMods/packager) can automatically include oUF.
+
+**.pkgmeta:**
+```yaml
+package-as: MyLayout
+
+externals:
+  oUF: https://github.com/oUF-wow/oUF.git
+
+ignore:
+  - README.md
+  - .gitignore
+```
+
+This downloads oUF automatically during packaging.
+
+### Manual Git Submodule
+
+```bash
+git submodule add https://github.com/oUF-wow/oUF.git oUF
+git submodule update --init --recursive
+```
+
+Update the submodule:
+
+```bash
+git submodule update --remote oUF
+```
+
+## Factory Control
+
+Control when your layout initializes:
+
+```lua
+-- Disable automatic factory
+oUF:DisableFactory()
+
+-- Do your setup
+SetupMySettings()
+LoadMyProfiles()
+
+-- Manually run the factory when ready
+oUF:RunFactoryQueue()
+```
+
+Or delay initialization:
+
+```lua
+oUF:Factory(function(oUF)
+  -- Wait for saved variables
+  if not MyLayoutDB then
+    -- Queue another factory call
+    C_Timer.After(0.1, function()
+      oUF:RunFactoryQueue()
+    end)
+    return
+  end
+  
+  -- Now spawn frames
+  oUF:SetActiveStyle('MyLayout')
+  oUF:Spawn('player'):SetPoint('CENTER', -220, -250)
+end)
+```
+
+## Namespace Pattern
+
+Keep oUF private to your addon:
+
+```lua
+-- Don't expose oUF globally
+local addon, ns = ...
+local oUF = ns.oUF
+
+-- Create your own API
+ns.frames = {}
+
+function ns.GetFrame(unit)
+  return ns.frames[unit]
+end
+
+function ns.UpdateFrames()
+  for _, frame in pairs(ns.frames) do
+    frame:UpdateAllElements('Manual')
+  end
+end
+
+-- Store references when spawning
+oUF:Factory(function(oUF)
+  oUF:SetActiveStyle('MyLayout')
+  
+  ns.frames.player = oUF:Spawn('player')
+  ns.frames.target = oUF:Spawn('target')
+end)
+```
+
+## Compatibility Checks
+
+Detect other oUF installations:
+
+```lua
+local addon, ns = ...
+local oUF = ns.oUF
+
+-- Check for other oUF versions
+if _G.oUF and _G.oUF ~= oUF then
+  print('Warning: Multiple oUF versions detected!')
+  print('MyLayout version:', oUF.version)
+  print('Global version:', _G.oUF.version)
+end
+
+-- Optionally prevent loading
+if _G.oUF and _G.oUF.version > oUF.version then
+  print('MyLayout: Newer oUF version detected, using that instead')
+  ns.oUF = _G.oUF
+end
+```
+
+## Complete Example
+
+Here's a complete embedded setup:
+
+**Directory structure:**
+```
+MyLayout/
+├── MyLayout.toc
+├── embeds.xml
+├── oUF/
+│   └── (oUF source files)
+├── core.lua
+├── config.lua
+└── layout.lua
+```
+
+**MyLayout.toc:**
+```
+## Interface: 110002
+## Title: My oUF Layout
+## Author: YourName
+## Version: 1.0.0
+## X-oUF: oUF_MyLayout
+## SavedVariables: MyLayoutDB
+
+embeds.xml
+core.lua
+config.lua
+layout.lua
+```
+
+**core.lua:**
+```lua
+local addon, ns = ...
+
+-- Get embedded oUF
+local oUF = oUF_MyLayout
+ns.oUF = oUF
+
+-- Addon namespace
+ns.frames = {}
+ns.config = {}
+
+print('MyLayout loaded with oUF', oUF.version)
+```
+
+**config.lua:**
+```lua
+local addon, ns = ...
+
+local defaults = {
+  scale = 1.0,
+  locked = false,
+}
+
+function ns.InitDB()
+  MyLayoutDB = MyLayoutDB or {}
+  for k, v in pairs(defaults) do
+    if MyLayoutDB[k] == nil then
+      MyLayoutDB[k] = v
+    end
+  end
+  ns.config = MyLayoutDB
+end
+```
+
+**layout.lua:**
+```lua
+local addon, ns = ...
+local oUF = ns.oUF
+
+local function StyleFrame(self, unit)
+  self:SetSize(200, 50)
+  
+  local Health = CreateFrame('StatusBar', nil, self)
+  Health:SetAllPoints()
+  Health.colorClass = true
+  self.Health = Health
+end
+
+oUF:RegisterStyle('MyLayout', StyleFrame)
+
+oUF:Factory(function(oUF)
+  ns.InitDB()
+  
+  oUF:SetActiveStyle('MyLayout')
+  
+  ns.frames.player = oUF:Spawn('player')
+  ns.frames.player:SetPoint('CENTER', -220, -250)
+  ns.frames.player:SetScale(ns.config.scale)
+  
+  ns.frames.target = oUF:Spawn('target')
+  ns.frames.target:SetPoint('CENTER', 220, -250)
+  ns.frames.target:SetScale(ns.config.scale)
+end)
+```
+
+## Tips
+
+<Tip>
+**Version your embedded oUF** - Tag your releases with the oUF version you're using (e.g., "MyLayout-1.2.3-oUF-10.2.6").
+</Tip>
+
+<Tip>
+**Keep a changelog** - Document which oUF version each release uses and any breaking changes.
+</Tip>
+
+<Tip>
+**Test across patches** - oUF updates for WoW patches. Test early on PTR.
+</Tip>
+
+<Warning>
+Don't modify oUF source files directly. Use callbacks and overrides instead to customize behavior.
+</Warning>
+
+## Next Steps
+
+- Learn about [creating nameplate frames](/guides/nameplates)
+- Explore [custom elements](/guides/custom-elements)
+- Read the [API reference](/api/ouf) for advanced features
