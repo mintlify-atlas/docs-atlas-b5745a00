@@ -344,6 +344,42 @@ oUF:AddElement('MyElement', Update, Enable, Disable)
 
 ## Utility Methods
 
+### DisableBlizzard
+
+Disables and hides Blizzard's default unit frames for the specified unit.
+
+```lua
+oUF:DisableBlizzard(unit)
+```
+
+<ParamField path="unit" type="string" required>
+  The unit type to disable Blizzard frames for. Supported values:
+  - `'player'` - Player frame
+  - `'target'` - Target frame
+  - `'focus'` - Focus frame
+  - `'pet'` - Pet frame
+  - `'party'` - Party frames
+  - `'boss'` - Boss frames
+  - `'arena'` - Arena frames
+  - `'nameplate'` - Nameplates
+</ParamField>
+
+<Note>
+  This is automatically called when you spawn frames with `:Spawn()`, but can be called manually if needed.
+</Note>
+
+**Example:**
+
+```lua
+-- Manually disable party frames before spawning
+oUF:DisableBlizzard('party')
+
+-- Create party header
+local party = oUF:SpawnHeader(...)
+```
+
+---
+
 ### RegisterInitCallback
 
 Adds a function to be executed when any unit frame or header is initialized.
